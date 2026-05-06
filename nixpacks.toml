@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ["nodejs_24", "npm-9_x", "openssl"]
+
+[phases.install]
+cmds = ["npm ci --include=dev"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "node dist/index.cjs"
