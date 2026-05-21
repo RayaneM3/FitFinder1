@@ -139,7 +139,7 @@ export default function Profile() {
             variant="ghost"
             size="sm"
             className="rounded-xl text-muted-foreground hover:text-foreground -ml-2"
-            onClick={() => window.history.back()}
+            onClick={() => setLocation("/explore")}
             data-testid="button-back"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />

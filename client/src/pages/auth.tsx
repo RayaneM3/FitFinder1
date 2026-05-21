@@ -72,7 +72,9 @@ export default function Auth() {
         try {
           await apiRequest("POST", "/api/legal/accept", { documentType: "TERMS", version: LEGAL_VERSION });
           await apiRequest("POST", "/api/legal/accept", { documentType: "PRIVACY", version: LEGAL_VERSION });
-        } catch {}
+        } catch (e) {
+          console.error("[legal/accept] Failed to record legal acceptance:", e);
+        }
       } else {
         await login(email, password);
       }

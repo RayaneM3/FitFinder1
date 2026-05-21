@@ -4,6 +4,7 @@ import { requireAuth } from "../middleware";
 import { z } from "zod";
 import { createReviewSchema } from "@shared/schema";
 import { pool } from "../db";
+import { deleteImage, R2_PUBLIC_URL } from "../upload";
 
 const router = Router();
 
@@ -11,6 +12,10 @@ const router = Router();
 router.delete("/api/account", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
+    // Fetch avatar URL before deletion so we can clean up R2
+    const userToDelete = await storage.getUser(userId);
+    const avatarUrl = userToDelete?.image;
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -35,6 +40,11 @@ router.delete("/api/account", requireAuth, async (req, res) => {
     } finally {
       client.release();
     }
+    // Clean up R2 avatar after DB deletion (best-effort)
+    if (avatarUrl && R2_PUBLIC_URL && avatarUrl.startsWith(R2_PUBLIC_URL)) {
+      deleteImage(avatarUrl).catch((e) => console.error("[account] Failed to delete avatar from R2:", e));
+    }
+
     req.session.destroy(() => {
       res.json({ success: true, message: "Account deleted" });
     });
@@ -96,6 +106,14 @@ router.get("/api/reviews/:trainerId", async (req, res) => {
 });
 
 // ========== PLANS ==========
+const createPlanSchema = z.object({
+  title: z.string().min(1, "Title is required").max(100, "Title must be 100 characters or less"),
+  description: z.string().max(2000, "Description must be 2000 characters or less").optional(),
+  priceCents: z.number().int().min(50, "Price must be at least $0.50"),
+  currency: z.enum(["usd", "gbp", "eur"]).default("usd"),
+  billingType: z.enum(["ONE_TIME", "MONTHLY"]).default("ONE_TIME"),
+});
+
 router.get("/api/plans", requireAuth, async (req, res) => {
   try {
     const plans = await storage.getPlans(req.session.userId!);
@@ -108,24 +126,24 @@ router.get("/api/plans", requireAuth, async (req, res) => {
 
 router.post("/api/plans", requireAuth, async (req, res) => {
   try {
-    const { title, description, priceCents, currency, billingType } = req.body;
-    if (!title || !priceCents) return res.status(400).json({ message: "title and price required" });
-    if (!Number.isInteger(priceCents) || priceCents < 50) {
-      return res.status(400).json({ message: "Price must be at least $0.50 (50 cents)" });
-    }
-
     const user = await storage.getUser(req.session.userId!);
     if (!user || (user.role !== "TRAINER" && user.role !== "BOTH")) {
       return res.status(403).json({ message: "Only trainers can create plans" });
     }
 
+    const parsed = createPlanSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0]?.message || "Validation error" });
+    }
+
+    const { title, description, priceCents, currency, billingType } = parsed.data;
     const plan = await storage.createPlan({
       trainerId: req.session.userId!,
       title,
       description: description || "",
       priceCents,
-      currency: currency || "usd",
-      billingType: billingType || "ONE_TIME",
+      currency,
+      billingType,
     });
     return res.json(plan);
   } catch (e) {
@@ -296,6 +314,15 @@ router.post("/api/legal/accept", requireAuth, async (req, res) => {
     const parsed = legalAcceptSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "Invalid documentType or version" });
+    }
+    // Deduplicate: skip insert if user already accepted this document+version
+    const alreadyAccepted = await storage.hasAccepted(
+      req.session.userId!,
+      parsed.data.documentType,
+      parsed.data.version,
+    );
+    if (alreadyAccepted) {
+      return res.json({ duplicate: true });
     }
     const acceptance = await storage.createLegalAcceptance({
       userId: req.session.userId!,

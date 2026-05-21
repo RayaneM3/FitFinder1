@@ -231,7 +231,7 @@ export type InsertReview = z.infer<typeof insertReviewSchema>;
 // --- Validation Schemas for API ---
 export const signupSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(8).max(72), // bcrypt only uses first 72 bytes; cap to prevent DoS
   name: z.string().min(1),
 });
 

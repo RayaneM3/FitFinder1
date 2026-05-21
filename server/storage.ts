@@ -317,7 +317,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: users.id,
         name: users.name,
-        email: users.email,
+        // email is intentionally excluded — not safe to expose on a public endpoint
         image: users.image,
         role: users.role,
         bio: profiles.bio,
@@ -381,7 +381,7 @@ export class DatabaseStorage implements IStorage {
         c.id, c.client_id, c.trainer_id, c.created_at, c.last_message_at,
         u.id AS other_user_id, u.name AS other_user_name, u.image AS other_user_image,
         lm.id AS last_msg_id, lm.sender_id AS last_msg_sender_id,
-        lm.content AS last_msg_content, lm.created_at AS last_msg_created_at,
+        LEFT(lm.content, 200) AS last_msg_content, lm.created_at AS last_msg_created_at,
         lm.read_at AS last_msg_read_at,
         COALESCE(uc.unread_count, 0) AS unread_count
       FROM conversations c

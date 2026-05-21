@@ -24,6 +24,12 @@ router.post("/api/conversations", requireAuth, async (req, res) => {
       return res.status(403).json({ message: "Only clients can initiate conversations" });
     }
 
+    // Only allow messaging trainers who have completed onboarding
+    const trainer = await storage.getUser(trainerId);
+    if (!trainer || !trainer.onboardingComplete || (trainer.role !== "TRAINER" && trainer.role !== "BOTH")) {
+      return res.status(404).json({ message: "Trainer not found" });
+    }
+
     const blocked = await storage.isBlocked(userId, trainerId);
     if (blocked) return res.status(403).json({ message: "Cannot message this user" });
 

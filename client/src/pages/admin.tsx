@@ -87,7 +87,7 @@ function AdminStats() {
   const cards = [
     { label: "Total Users", value: isLoading ? "—" : (data?.totalUsers ?? 0), icon: <Users className="w-5 h-5 text-muted-foreground" /> },
     { label: "Total Trainers", value: isLoading ? "—" : (data?.totalTrainers ?? 0), icon: <TrendingUp className="w-5 h-5 text-muted-foreground" /> },
-    { label: "Total Revenue", value: isLoading ? "—" : `$${((data?.totalRevenue ?? 0) / 100).toFixed(0)}`, icon: <TrendingUp className="w-5 h-5 text-muted-foreground" /> },
+    { label: "Revenue (USD)", value: isLoading ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format((data?.totalRevenue ?? 0) / 100), icon: <TrendingUp className="w-5 h-5 text-muted-foreground" /> },
     { label: "Open Reports", value: isLoading ? "—" : (data?.openReports ?? 0), icon: <ShieldAlert className="w-5 h-5 text-muted-foreground" /> },
   ];
 
@@ -220,29 +220,34 @@ function ReportsTab() {
   );
 }
 
+const PAGE_SIZE = 20;
+
 function UsersTab() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [banTarget, setBanTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [warnTarget, setWarnTarget] = useState<{ id: string; name: string } | null>(null);
   const [warnReason, setWarnReason] = useState("");
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 300);
     return () => clearTimeout(t);
   }, [search]);
 
   const { data, isLoading, isError: usersError } = useQuery<{ users: any[]; total: number }>({
-    queryKey: ["/api/admin/users", debouncedSearch],
+    queryKey: ["/api/admin/users", debouncedSearch, page],
     queryFn: async () => {
-      const params = new URLSearchParams({ search: debouncedSearch, pageSize: "50" });
+      const params = new URLSearchParams({ search: debouncedSearch, pageSize: String(PAGE_SIZE), page: String(page) });
       const res = await fetch(`${API_BASE}/api/admin/users?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
   });
+
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
 
   const banMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -387,6 +392,34 @@ function UsersTab() {
           {!data?.users?.length && (
             <div className="text-center py-8 text-muted-foreground">No users found.</div>
           )}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+          <span>{data?.total ?? 0} users total</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              Previous
+            </Button>
+            <span className="px-2">Page {page} of {totalPages}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
 

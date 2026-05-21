@@ -41,6 +41,9 @@ router.patch("/api/settings/password", requireAuth, async (req, res) => {
     if (!currentPassword || !newPassword || newPassword.length < 8) {
       return res.status(400).json({ message: "Password must be at least 8 characters" });
     }
+    if (newPassword.length > 72) {
+      return res.status(400).json({ message: "Password must be 72 characters or less" });
+    }
     const user = await storage.getUser(req.session.userId!);
     if (!user || !user.passwordHash) return res.status(400).json({ message: "Cannot change password" });
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);

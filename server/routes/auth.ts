@@ -20,6 +20,14 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const meLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120, // 2 req/sec — generous for page loads but blocks floods
+  message: { message: "Too many requests" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 router.post("/api/auth/signup", authLimiter, async (req, res) => {
   try {
     const data = signupSchema.parse(req.body);
@@ -73,7 +81,7 @@ router.post("/api/auth/logout", (req, res) => {
   });
 });
 
-router.get("/api/auth/me", async (req, res) => {
+router.get("/api/auth/me", meLimiter, async (req, res) => {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Not authenticated" });
   }
@@ -176,10 +184,10 @@ router.post("/api/auth/reset-password", resetPasswordLimiter, async (req, res) =
       .set({ usedAt: new Date() })
       .where(eq(passwordResetTokens.id, resetToken.id));
 
-    // Destroy all sessions for this user
+    // Destroy all sessions for this user (JSONB operator — safe, no full table scan)
     await pool.query(
-      `DELETE FROM session WHERE sess::text LIKE $1`,
-      [`%"userId":"${resetToken.userId}"%`]
+      `DELETE FROM session WHERE sess->>'userId' = $1`,
+      [resetToken.userId]
     );
 
     return res.json({ message: "Password reset successful. Please sign in." });
