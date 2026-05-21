@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CreditCard, Settings, ChevronRight, MessageSquare, Search, Loader2, Plus,
   Dumbbell, Users, TrendingUp, Heart, CheckCircle2, Circle, Clock, MapPin,
-  FileText, User, Sparkles, ArrowRight, Star
+  FileText, User, Sparkles, ArrowRight, Star, AlertCircle
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,11 @@ import { useMutation } from "@tanstack/react-query";
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    document.title = "Dashboard | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -319,7 +324,7 @@ function StatsSkeleton() {
 function TrainerDashboard() {
   const { toast } = useToast();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["/api/dashboard/trainer"],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/dashboard/trainer`, { credentials: "include" });
@@ -369,6 +374,18 @@ function TrainerDashboard() {
   const hasPlans = !!myPlans?.length;
   const hasConversations = !!data?.leads?.length;
   const revenue = ((data?.orders || []).filter((o: any) => o.status === "PAID").reduce((sum: number, o: any) => sum + o.amountCents, 0) / 100);
+
+  if (isError) {
+    return (
+      <div className="flex items-start gap-3 p-4 border border-destructive/30 rounded-2xl bg-destructive/5 text-sm">
+        <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+        <div>
+          <p className="font-semibold text-destructive">Failed to load dashboard data</p>
+          <p className="text-muted-foreground text-xs mt-0.5">Please refresh the page to try again.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -512,7 +529,7 @@ function TrainerDashboard() {
 }
 
 function ClientDashboard() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["/api/dashboard/client"],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/dashboard/client`, { credentials: "include" });
@@ -532,6 +549,18 @@ function ClientDashboard() {
 
   const hasFavorites = !!data?.favorites?.length;
   const hasOrders = !!data?.orders?.length;
+
+  if (isError) {
+    return (
+      <div className="flex items-start gap-3 p-4 border border-destructive/30 rounded-2xl bg-destructive/5 text-sm">
+        <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+        <div>
+          <p className="font-semibold text-destructive">Failed to load dashboard data</p>
+          <p className="text-muted-foreground text-xs mt-0.5">Please refresh the page to try again.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

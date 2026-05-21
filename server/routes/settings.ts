@@ -52,7 +52,8 @@ router.post("/api/settings/avatar", requireAuth, async (req, res) => {
     if (!mimeMatch || !allowedMimeTypes.includes(mimeMatch[1])) {
       return res.status(400).json({ message: "Unsupported image format. Use JPEG, PNG, WebP, or GIF." });
     }
-    if (image.length > 5 * 1024 * 1024) {
+    // Base64 strings are ~33% larger than binary — 7MB base64 ≈ 5MB actual image data
+    if (image.length > 7 * 1024 * 1024) {
       return res.status(400).json({ message: "Image too large (max 5MB)" });
     }
     // Delete old R2 image if present

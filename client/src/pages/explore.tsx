@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, SlidersHorizontal, X, Sparkles, UserSearch, Dumbbell, ChevronRight, TrendingUp, Globe, Star } from "lucide-react";
+import { Search, MapPin, SlidersHorizontal, X, Sparkles, UserSearch, Dumbbell, ChevronRight, TrendingUp, Globe, Star, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -39,6 +39,11 @@ const COUNTRIES = [
 type CoachingModeFilter = "" | "ONLINE" | "IN_PERSON" | "HYBRID";
 
 export default function Explore() {
+  useEffect(() => {
+    document.title = "Explore Trainers | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
+
   const [searchInput, setSearchInput] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
@@ -72,7 +77,7 @@ export default function Explore() {
     return params;
   }, [debouncedSearch, city, country, coachingMode, selectedSpecialties, priceRange, language, sort, page]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["/api/trainers", queryParams.toString()],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/trainers?${queryParams.toString()}`);
@@ -346,7 +351,20 @@ export default function Explore() {
               </Select>
             </div>
 
-            {isLoading ? (
+            {isError ? (
+              <div className="text-center py-12 px-4 border rounded-2xl">
+                <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+                  <AlertCircle className="h-6 w-6 text-destructive" />
+                </div>
+                <h3 className="text-lg font-bold mb-1">Something went wrong</h3>
+                <p className="text-muted-foreground text-sm max-w-sm mx-auto mb-5">
+                  We couldn't load trainers right now. Please check your connection and try again.
+                </p>
+                <Button onClick={() => window.location.reload()} size="sm" className="rounded-xl">
+                  Try again
+                </Button>
+              </div>
+            ) : isLoading ? (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>

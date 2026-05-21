@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "wouter";
+import { useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,11 @@ export default function Profile() {
     },
     enabled: !!id,
   });
+
+  useEffect(() => {
+    document.title = trainer?.name ? `${trainer.name} | Fit Finder` : "Trainer Profile | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, [trainer?.name]);
 
   const requestChatMutation = useMutation({
     mutationFn: async () => {

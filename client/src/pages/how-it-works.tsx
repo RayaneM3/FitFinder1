@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -7,6 +8,11 @@ import {
 } from "lucide-react";
 
 export default function HowItWorks() {
+  useEffect(() => {
+    document.title = "How It Works | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
+
   return (
     <Layout>
       <section className="pt-20 pb-16 lg:pt-28 lg:pb-20">

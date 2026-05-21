@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -53,6 +54,11 @@ const pricingFaqs = [
 ];
 
 export default function Pricing() {
+  useEffect(() => {
+    document.title = "Pricing | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
+
   return (
     <Layout>
       <section className="pt-20 pb-16 lg:pt-28 lg:pb-20">

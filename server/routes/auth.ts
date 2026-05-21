@@ -5,8 +5,7 @@ import crypto from "crypto";
 import { signupSchema, signinSchema } from "@shared/schema";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
-import { db } from "../db";
-import { pool } from "../db";
+import { db, pool } from "../db";
 import { passwordResetTokens } from "@shared/schema";
 import { eq, and, gt, isNull } from "drizzle-orm";
 import { sendEmail, passwordResetEmail } from "../email";
@@ -24,18 +23,19 @@ const authLimiter = rateLimit({
 router.post("/api/auth/signup", authLimiter, async (req, res) => {
   try {
     const data = signupSchema.parse(req.body);
-    const existing = await storage.getUserByEmail(data.email);
+    const normalizedEmail = data.email.toLowerCase().trim();
+    const existing = await storage.getUserByEmail(normalizedEmail);
     if (existing) {
       return res.status(409).json({ message: "An account with this email already exists" });
     }
     const passwordHash = await bcrypt.hash(data.password, 12);
     const user = await storage.createUser({
-      email: data.email,
+      email: normalizedEmail,
       passwordHash,
-      name: data.name,
+      name: data.name.trim(),
     });
     req.session.userId = user.id;
-    return res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, onboardingComplete: user.onboardingComplete } });
+    return res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, onboardingComplete: user.onboardingComplete, isAdmin: user.isAdmin } });
   } catch (e: any) {
     if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0]?.message || "Validation error" });
     console.error("[POST /api/auth/signup]:", e);
@@ -46,7 +46,8 @@ router.post("/api/auth/signup", authLimiter, async (req, res) => {
 router.post("/api/auth/signin", authLimiter, async (req, res) => {
   try {
     const data = signinSchema.parse(req.body);
-    const user = await storage.getUserByEmail(data.email);
+    const normalizedEmail = data.email.toLowerCase().trim();
+    const user = await storage.getUserByEmail(normalizedEmail);
     if (!user || !user.passwordHash) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -54,8 +55,11 @@ router.post("/api/auth/signin", authLimiter, async (req, res) => {
     if (!valid) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
+    if (user.bannedAt) {
+      return res.status(403).json({ message: "Account suspended. Please contact support." });
+    }
     req.session.userId = user.id;
-    return res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, onboardingComplete: user.onboardingComplete, image: user.image } });
+    return res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, onboardingComplete: user.onboardingComplete, image: user.image, isAdmin: user.isAdmin } });
   } catch (e: any) {
     if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0]?.message || "Validation error" });
     console.error("[POST /api/auth/signin]:", e);
@@ -119,8 +123,9 @@ router.post("/api/auth/forgot-password", forgotPasswordLimiter, async (req, res)
 
     await db.insert(passwordResetTokens).values({ userId: user.id, token, expiresAt });
 
-    const APP_URL = process.env.APP_URL || "https://fitfinder.co";
-    const resetUrl = `${APP_URL}/reset-password/${token}`;
+    // Use FRONTEND_URL so the link goes to the client app, not the API server
+    const FRONTEND_URL = process.env.FRONTEND_URL || process.env.APP_URL || "https://fitfinder.co";
+    const resetUrl = `${FRONTEND_URL}/reset-password/${token}`;
     const { subject, html } = passwordResetEmail(resetUrl);
     await sendEmail(user.email, subject, html);
 
@@ -131,7 +136,15 @@ router.post("/api/auth/forgot-password", forgotPasswordLimiter, async (req, res)
   }
 });
 
-router.post("/api/auth/reset-password", async (req, res) => {
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { message: "Too many attempts. Please wait 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post("/api/auth/reset-password", resetPasswordLimiter, async (req, res) => {
   try {
     const { token, newPassword } = req.body;
     if (!token || typeof token !== "string" || !newPassword || newPassword.length < 8) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,11 @@ export default function Onboarding() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  useEffect(() => {
+    document.title = "Get Started | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 

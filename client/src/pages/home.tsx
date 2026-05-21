@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -13,6 +14,10 @@ import { API_BASE } from "@/lib/queryClient";
 const SOCIAL_AVATARS = [trainerAvatar1, trainerAvatar2, trainerAvatar3, trainerAvatar4];
 
 export default function Home() {
+  useEffect(() => {
+    document.title = "Fit Finder | Find a Personal Trainer";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
   const { data: stats } = useQuery<{ trainerCount: number; userCount: number }>({
     queryKey: ["/api/stats"],
     queryFn: async () => {

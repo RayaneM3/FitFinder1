@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Send, MoreVertical, ShieldAlert, MessageCircle, Search, User, ArrowLeft, X } from "lucide-react";
+import { Send, MoreVertical, ShieldAlert, MessageCircle, Search, User, ArrowLeft, X, AlertCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, API_BASE } from "@/lib/queryClient";
@@ -50,6 +50,11 @@ export default function Messages() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    document.title = "Messages | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
+
+  useEffect(() => {
     if (conversationId) setActiveConvoId(conversationId);
   }, [conversationId]);
 
@@ -78,7 +83,7 @@ export default function Messages() {
     queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
   }, [wsMessage, activeConvoId]);
 
-  const { data: conversations, isLoading: convosLoading } = useQuery({
+  const { data: conversations, isLoading: convosLoading, isError: convosError } = useQuery({
     queryKey: ["/api/conversations"],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/conversations`, { credentials: "include" });
@@ -89,7 +94,7 @@ export default function Messages() {
     refetchIntervalInBackground: false,
   });
 
-  const { data: msgs, isLoading: msgsLoading } = useQuery({
+  const { data: msgs, isLoading: msgsLoading, isError: msgsError } = useQuery({
     queryKey: ["/api/messages", activeConvoId],
     queryFn: async () => {
       if (!activeConvoId) return [];
@@ -206,6 +211,17 @@ export default function Messages() {
                   <ConversationSkeleton />
                   <ConversationSkeleton />
                 </>
+              ) : convosError ? (
+                <div className="text-center py-8 px-6">
+                  <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                  </div>
+                  <p className="text-sm font-medium mb-1">Couldn't load conversations</p>
+                  <p className="text-xs text-muted-foreground mb-3">Check your connection and try again.</p>
+                  <Button size="sm" variant="outline" className="rounded-lg" onClick={() => window.location.reload()}>
+                    Retry
+                  </Button>
+                </div>
               ) : (() => {
                 const filteredConversations = (conversations || []).filter((convo: any) => {
                   if (!searchQuery.trim()) return true;
@@ -376,6 +392,16 @@ export default function Messages() {
                     <MessageSkeleton isMe={true} />
                     <MessageSkeleton isMe={false} />
                     <MessageSkeleton isMe={true} />
+                  </div>
+                ) : msgsError ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="text-center">
+                      <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+                        <AlertCircle className="h-5 w-5 text-destructive" />
+                      </div>
+                      <p className="text-sm font-medium mb-1">Couldn't load messages</p>
+                      <p className="text-xs text-muted-foreground">Please refresh the page to try again.</p>
+                    </div>
                   </div>
                 ) : (msgs || []).length === 0 ? (
                   <div className="flex-1 flex items-center justify-center py-16">

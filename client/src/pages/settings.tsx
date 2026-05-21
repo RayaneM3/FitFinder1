@@ -33,7 +33,12 @@ export default function Settings() {
   const isTrainer = user?.role === "TRAINER" || user?.role === "BOTH";
   const isClient = user?.role === "CLIENT" || user?.role === "BOTH";
 
-  const { data: profile } = useQuery<any>({
+  useEffect(() => {
+    document.title = "Settings | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
+
+  const { data: profile, isLoading: profileLoading } = useQuery<any>({
     queryKey: ["/api/auth/me"],
     enabled: isAuthenticated,
   });
@@ -253,6 +258,25 @@ export default function Settings() {
 
   const tabCount = 3 + (isTrainer ? 1 : 0) + (isClient ? 1 : 0);
   const gridCols = tabCount === 3 ? "grid-cols-3" : tabCount === 4 ? "grid-cols-4" : "grid-cols-5";
+
+  if (profileLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 md:px-8 py-8 max-w-3xl">
+          <div className="h-9 w-32 bg-muted rounded-lg mb-8 animate-pulse" />
+          <div className="h-12 w-full bg-muted rounded-xl mb-8 animate-pulse" />
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="space-y-2">
+                <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+                <div className="h-12 w-full bg-muted rounded-xl animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>

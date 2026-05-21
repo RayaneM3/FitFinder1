@@ -32,7 +32,13 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     return res.status(401).json({ message: "Unauthorized" });
   }
   const user = await storage.getUser(req.session.userId);
-  if (!user?.isAdmin) {
+  if (!user) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  if (user.bannedAt) {
+    return res.status(403).json({ message: "Account suspended" });
+  }
+  if (!user.isAdmin) {
     return res.status(403).json({ message: "Admin access required" });
   }
   next();

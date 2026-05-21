@@ -13,6 +13,11 @@ export default function ResetPassword() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  useEffect(() => {
+    document.title = "Reset Password | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
+
   // State 1: request reset (no token)
   const [requestEmail, setRequestEmail] = useState("");
   const [requestLoading, setRequestLoading] = useState(false);

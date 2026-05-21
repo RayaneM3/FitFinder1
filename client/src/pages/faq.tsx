@@ -1,7 +1,13 @@
+import { useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function FAQ() {
+  useEffect(() => {
+    document.title = "FAQ | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
+
   return (
     <Layout>
       <div className="container mx-auto px-4 md:px-8 py-16 max-w-3xl">

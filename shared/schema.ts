@@ -186,7 +186,7 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
 });
 
 // --- Insert Schemas ---
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true, isAdmin: true, bannedAt: true });
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTrainerProfileSchema = createInsertSchema(trainerProfiles).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientProfileSchema = createInsertSchema(clientProfiles).omit({ id: true, createdAt: true, updatedAt: true });

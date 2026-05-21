@@ -89,6 +89,9 @@ router.post("/api/messages", requireAuth, async (req, res) => {
     if (!conversationId || !content?.trim()) {
       return res.status(400).json({ message: "conversationId and content required" });
     }
+    if (content.trim().length > 5000) {
+      return res.status(400).json({ message: "Message too long (max 5000 characters)" });
+    }
 
     const convo = await storage.getConversation(conversationId);
     if (!convo) return res.status(404).json({ message: "Conversation not found" });
@@ -165,12 +168,15 @@ router.get("/api/blocked", requireAuth, async (req, res) => {
 router.post("/api/report", requireAuth, async (req, res) => {
   try {
     const { reportedId, category, details } = req.body;
+    const VALID_CATEGORIES = ["HARASSMENT", "SPAM", "INAPPROPRIATE", "SCAM", "OTHER"];
     if (!reportedId || !category) return res.status(400).json({ message: "reportedId and category required" });
+    if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ message: "Invalid category" });
+    if (reportedId === req.session.userId) return res.status(400).json({ message: "Cannot report yourself" });
     await storage.createReport({
       reporterId: req.session.userId!,
       reportedId,
       category: category as any,
-      details: details || "",
+      details: typeof details === "string" ? details.slice(0, 1000) : "",
     });
     return res.json({ success: true });
   } catch (e) {

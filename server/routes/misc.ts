@@ -3,8 +3,7 @@ import { storage } from "../storage";
 import { requireAuth } from "../middleware";
 import { z } from "zod";
 import { createReviewSchema } from "@shared/schema";
-import { db } from "../db";
-import { sql } from "drizzle-orm";
+import { pool } from "../db";
 
 const router = Router();
 
@@ -12,23 +11,30 @@ const router = Router();
 router.delete("/api/account", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    await db.execute(sql`
-      BEGIN;
-      DELETE FROM messages WHERE sender_id = ${userId};
-      DELETE FROM conversations WHERE client_id = ${userId} OR trainer_id = ${userId};
-      UPDATE orders SET status = 'CANCELED', updated_at = NOW() WHERE buyer_id = ${userId} AND status = 'PENDING';
-      DELETE FROM orders WHERE buyer_id = ${userId};
-      DELETE FROM reviews WHERE reviewer_id = ${userId};
-      DELETE FROM favorites WHERE user_id = ${userId};
-      DELETE FROM blocks WHERE blocker_id = ${userId} OR blocked_id = ${userId};
-      DELETE FROM reports WHERE reporter_id = ${userId};
-      DELETE FROM legal_acceptances WHERE user_id = ${userId};
-      DELETE FROM client_profiles WHERE user_id = ${userId};
-      DELETE FROM trainer_profiles WHERE user_id = ${userId};
-      DELETE FROM profiles WHERE user_id = ${userId};
-      DELETE FROM users WHERE id = ${userId};
-      COMMIT;
-    `);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`DELETE FROM messages WHERE sender_id = $1`, [userId]);
+      await client.query(`DELETE FROM conversations WHERE client_id = $1 OR trainer_id = $1`, [userId]);
+      await client.query(`UPDATE orders SET status = 'CANCELED', updated_at = NOW() WHERE buyer_id = $1 AND status = 'PENDING'`, [userId]);
+      await client.query(`DELETE FROM orders WHERE buyer_id = $1`, [userId]);
+      await client.query(`DELETE FROM reviews WHERE reviewer_id = $1`, [userId]);
+      await client.query(`DELETE FROM favorites WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`, [userId]);
+      await client.query(`DELETE FROM reports WHERE reporter_id = $1`, [userId]);
+      await client.query(`DELETE FROM legal_acceptances WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM password_reset_tokens WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM client_profiles WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM trainer_profiles WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM profiles WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM users WHERE id = $1`, [userId]);
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
     req.session.destroy(() => {
       res.json({ success: true, message: "Account deleted" });
     });
@@ -104,6 +110,9 @@ router.post("/api/plans", requireAuth, async (req, res) => {
   try {
     const { title, description, priceCents, currency, billingType } = req.body;
     if (!title || !priceCents) return res.status(400).json({ message: "title and price required" });
+    if (!Number.isInteger(priceCents) || priceCents < 50) {
+      return res.status(400).json({ message: "Price must be at least $0.50 (50 cents)" });
+    }
 
     const user = await storage.getUser(req.session.userId!);
     if (!user || (user.role !== "TRAINER" && user.role !== "BOTH")) {

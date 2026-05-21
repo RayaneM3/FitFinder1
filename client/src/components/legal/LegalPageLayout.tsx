@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Link } from "wouter";
 import { HelpCircle, ChevronRight, ArrowUp } from "lucide-react";
@@ -16,6 +17,11 @@ interface LegalPageLayoutProps {
 }
 
 export default function LegalPageLayout({ title, lastUpdated, toc, children }: LegalPageLayoutProps) {
+  useEffect(() => {
+    document.title = `${title} | Fit Finder`;
+    return () => { document.title = "Fit Finder"; };
+  }, [title]);
+
   return (
     <Layout>
       <div className="border-b">
@@ -74,7 +80,7 @@ export default function LegalPageLayout({ title, lastUpdated, toc, children }: L
 
             <div className="mt-8 pt-6 border-t flex justify-between items-center">
               <p className="text-xs text-muted-foreground">
-                &copy; {new Date().getFullYear()} [Company Legal Name]. All rights reserved.
+                &copy; {new Date().getFullYear()} Fit Finder. All rights reserved.
               </p>
               <button
                 onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}

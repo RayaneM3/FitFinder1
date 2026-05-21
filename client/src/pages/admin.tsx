@@ -17,12 +17,17 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { Users, FileWarning, TrendingUp, ShieldAlert, MoreVertical, Loader2 } from "lucide-react";
+import { Users, FileWarning, TrendingUp, ShieldAlert, MoreVertical, Loader2, AlertCircle } from "lucide-react";
 
 export default function Admin() {
   const { user, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  useEffect(() => {
+    document.title = "Admin Dashboard | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) setLocation("/auth");
@@ -61,7 +66,7 @@ export default function Admin() {
 }
 
 function AdminStats() {
-  const { data, isLoading } = useQuery<any>({
+  const { data, isLoading, isError } = useQuery<any>({
     queryKey: ["/api/admin/stats"],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/admin/stats`, { credentials: "include" });
@@ -69,6 +74,15 @@ function AdminStats() {
       return res.json();
     },
   });
+
+  if (isError) {
+    return (
+      <div className="flex items-center gap-3 p-4 border border-destructive/30 rounded-2xl bg-destructive/5 text-sm">
+        <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+        <p className="text-destructive font-medium">Failed to load stats. Please refresh the page.</p>
+      </div>
+    );
+  }
 
   const cards = [
     { label: "Total Users", value: isLoading ? "—" : (data?.totalUsers ?? 0), icon: <Users className="w-5 h-5 text-muted-foreground" /> },
@@ -97,7 +111,7 @@ function AdminStats() {
 function ReportsTab() {
   const { toast } = useToast();
 
-  const { data: reports, isLoading } = useQuery<any[]>({
+  const { data: reports, isLoading, isError } = useQuery<any[]>({
     queryKey: ["/api/admin/reports"],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/admin/reports`, { credentials: "include" });
@@ -132,6 +146,12 @@ function ReportsTab() {
   };
 
   if (isLoading) return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  if (isError) return (
+    <div className="flex items-center gap-3 p-4 border border-destructive/30 rounded-2xl bg-destructive/5 text-sm">
+      <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+      <p className="text-destructive font-medium">Failed to load reports. Please refresh the page.</p>
+    </div>
+  );
   if (!reports?.length) return <div className="text-center py-12 text-muted-foreground">No reports yet.</div>;
 
   return (
@@ -207,7 +227,7 @@ function UsersTab() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data, isLoading } = useQuery<{ users: any[]; total: number }>({
+  const { data, isLoading, isError: usersError } = useQuery<{ users: any[]; total: number }>({
     queryKey: ["/api/admin/users", debouncedSearch],
     queryFn: async () => {
       const params = new URLSearchParams({ search: debouncedSearch, pageSize: "50" });
@@ -268,6 +288,11 @@ function UsersTab() {
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+      ) : usersError ? (
+        <div className="flex items-center gap-3 p-4 border border-destructive/30 rounded-2xl bg-destructive/5 text-sm">
+          <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+          <p className="text-destructive font-medium">Failed to load users. Please refresh the page.</p>
+        </div>
       ) : (
         <div className="rounded-2xl border overflow-hidden">
           <table className="w-full text-sm">

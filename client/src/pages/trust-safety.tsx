@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import Layout from "@/components/layout/Layout";
 import { Link, useRoute } from "wouter";
 import {
@@ -437,6 +438,11 @@ function SubPage({ slug }: { slug: string }) {
 }
 
 export default function TrustSafety() {
+  useEffect(() => {
+    document.title = "Trust & Safety | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, []);
+
   const [, params] = useRoute("/trust-safety/:slug");
 
   if (params?.slug) {

@@ -99,6 +99,9 @@ router.get("/api/admin/users", requireAdmin, async (req, res) => {
 router.post("/api/admin/users/:id/ban", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+    if (id === req.session.userId) {
+      return res.status(400).json({ message: "You cannot ban your own account" });
+    }
     await pool.query(
       `UPDATE users SET "bannedAt" = now() WHERE id = $1`,
       [id]
