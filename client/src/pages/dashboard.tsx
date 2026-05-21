@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CreditCard, Settings, ChevronRight, MessageSquare, Search, Loader2, Plus,
   Dumbbell, Users, TrendingUp, Heart, CheckCircle2, Circle, Clock, MapPin,
-  FileText, User, Sparkles, ArrowRight, Star, AlertCircle
+  FileText, User, Sparkles, ArrowRight, Star, AlertCircle, Pencil, Trash2, ToggleLeft, ToggleRight
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -619,14 +619,7 @@ function TrainerDashboard() {
         ) : (
           <div className="grid sm:grid-cols-2 gap-3">
             {myPlans.map((plan: any) => (
-              <div key={plan.id} className="border rounded-xl p-4">
-                <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-semibold text-sm">{plan.title}</h3>
-                  <Badge variant={plan.isActive ? "default" : "secondary"} className="text-[10px] px-1.5">{plan.isActive ? "Active" : "Inactive"}</Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{plan.description}</p>
-                <p className="font-bold text-sm">${(plan.priceCents / 100).toFixed(0)} <span className="text-xs font-normal text-muted-foreground">/ {plan.billingType === "MONTHLY" ? "month" : "one-time"}</span></p>
-              </div>
+              <PlanCard key={plan.id} plan={plan} />
             ))}
           </div>
         )}
@@ -749,9 +742,13 @@ function ClientDashboard() {
               <div className="grid sm:grid-cols-2 gap-3">
                 {data.favorites.map((fav: any) => (
                   <Link key={fav.id} href={`/profile/${fav.trainerId}`}>
-                    <div className="border rounded-xl p-3 flex gap-3 bg-card items-center hover:bg-muted/30 transition-colors cursor-pointer">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm">
-                        {fav.name?.charAt(0) || "?"}
+                    <div className="border rounded-xl p-3 flex gap-3 bg-card items-center hover:bg-muted/30 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm overflow-hidden shrink-0">
+                        {fav.image ? (
+                          <img src={fav.image} alt={fav.name} className="w-full h-full object-cover" />
+                        ) : (
+                          fav.name?.charAt(0) || "?"
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-sm">{fav.name}</h4>
@@ -777,10 +774,14 @@ function ClientDashboard() {
               <div className="grid sm:grid-cols-3 gap-3">
                 {suggestedTrainers.trainers.slice(0, 3).map((t: any) => (
                   <Link key={t.id} href={`/profile/${t.id}`}>
-                    <div className="border rounded-xl p-3 hover:bg-muted/30 transition-colors cursor-pointer" data-testid={`suggested-trainer-${t.id}`}>
+                    <div className="border rounded-xl p-3 hover:bg-muted/30 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 cursor-pointer" data-testid={`suggested-trainer-${t.id}`}>
                       <div className="flex items-center gap-2.5 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-xs">
-                          {t.name?.charAt(0)}
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-xs overflow-hidden shrink-0">
+                          {t.image ? (
+                            <img src={t.image} alt={t.name} className="w-full h-full object-cover" />
+                          ) : (
+                            t.name?.charAt(0)
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-sm truncate">{t.name}</p>
@@ -806,9 +807,141 @@ function ClientDashboard() {
   );
 }
 
+function PlanCard({ plan }: { plan: any }) {
+  const [editOpen, setEditOpen] = useState(false);
+  return (
+    <div className="border rounded-xl p-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 group">
+      <div className="flex justify-between items-start mb-1">
+        <h3 className="font-semibold text-sm flex-1 mr-2">{plan.title}</h3>
+        <div className="flex items-center gap-1.5">
+          <Badge variant={plan.isActive ? "default" : "secondary"} className="text-[10px] px-1.5">{plan.isActive ? "Active" : "Inactive"}</Badge>
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogTrigger asChild>
+              <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground" aria-label="Edit plan">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md rounded-2xl">
+              <DialogHeader><DialogTitle>Edit Plan</DialogTitle></DialogHeader>
+              <EditPlanDialog plan={plan} onClose={() => setEditOpen(false)} />
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{plan.description}</p>
+      <p className="font-bold text-sm">${(plan.priceCents / 100).toFixed(0)} <span className="text-xs font-normal text-muted-foreground">/ {plan.billingType === "MONTHLY" ? "month" : "one-time"}</span></p>
+    </div>
+  );
+}
+
 function CreatePlanDialogCompact() {
   return (
     <CreatePlanDialog buttonVariant="ghost" buttonSize="default" isCompact />
+  );
+}
+
+function EditPlanDialog({ plan, onClose }: { plan: any; onClose: () => void }) {
+  const { toast } = useToast();
+  const [title, setTitle] = useState(plan.title || "");
+  const [description, setDescription] = useState(plan.description || "");
+  const [price, setPrice] = useState(String((plan.priceCents / 100).toFixed(2)));
+  const [billingType, setBillingType] = useState(plan.billingType || "ONE_TIME");
+  const [isActive, setIsActive] = useState(plan.isActive !== false);
+  const [deleting, setDeleting] = useState(false);
+
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/plans/${plan.id}`, {
+        title,
+        description,
+        priceCents: Math.round(parseFloat(price) * 100),
+        billingType,
+        isActive,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Plan updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/plans"] });
+      onClose();
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleDelete = async () => {
+    if (!window.confirm("Delete this plan? This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      await apiRequest("PATCH", `/api/plans/${plan.id}`, { isActive: false });
+      toast({ title: "Plan deactivated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/plans"] });
+      onClose();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 pt-2">
+      <div className="space-y-2">
+        <Label htmlFor="edit-plan-title" className="text-sm">Title</Label>
+        <Input id="edit-plan-title" value={title} onChange={e => setTitle(e.target.value)} className="rounded-xl h-10" />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="edit-plan-description" className="text-sm">Description</Label>
+        <Textarea id="edit-plan-description" value={description} onChange={e => setDescription(e.target.value)} className="rounded-xl" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-plan-price" className="text-sm">Price ($)</Label>
+          <Input id="edit-plan-price" type="number" min={0.50} step={0.01} value={price} onChange={e => setPrice(e.target.value)} className="rounded-xl h-10" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-plan-billing" className="text-sm">Billing</Label>
+          <Select value={billingType} onValueChange={setBillingType}>
+            <SelectTrigger id="edit-plan-billing" className="rounded-xl h-10"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ONE_TIME">One-Time</SelectItem>
+              <SelectItem value="MONTHLY">Monthly</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="flex items-center justify-between p-3 border rounded-xl">
+        <div>
+          <p className="text-sm font-medium">Plan Active</p>
+          <p className="text-xs text-muted-foreground">Inactive plans won't be visible to clients</p>
+        </div>
+        <button
+          onClick={() => setIsActive(a => !a)}
+          className={`transition-colors duration-200 ${isActive ? "text-primary" : "text-muted-foreground"}`}
+        >
+          {isActive ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
+        </button>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <Button
+          className="flex-1 rounded-xl h-10"
+          onClick={() => editMutation.mutate()}
+          disabled={!title || !price || editMutation.isPending}
+        >
+          {editMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Save Changes
+        </Button>
+        <Button
+          variant="outline"
+          className="rounded-xl h-10 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+          onClick={handleDelete}
+          disabled={deleting}
+        >
+          {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -845,7 +978,7 @@ function OrderCard({ order }: { order: any }) {
   });
 
   return (
-    <div className="flex items-center justify-between p-3 border rounded-xl bg-card">
+    <div className="flex items-center justify-between p-3 border rounded-xl bg-card transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5">
       <div>
         <p className="font-medium text-sm">{order.planTitle || "Custom Plan"}</p>
         <p className="text-xs text-muted-foreground">with {order.trainerName}</p>
@@ -870,9 +1003,9 @@ function OrderCard({ order }: { order: any }) {
                       <button
                         key={star}
                         onClick={() => setRating(star)}
-                        className="p-0.5"
+                        className="p-0.5 transition-transform duration-100 hover:scale-125 active:scale-95"
                       >
-                        <Star className={`w-6 h-6 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/30'}`} />
+                        <Star className={`w-6 h-6 transition-colors duration-150 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/30 hover:text-yellow-300'}`} />
                       </button>
                     ))}
                   </div>

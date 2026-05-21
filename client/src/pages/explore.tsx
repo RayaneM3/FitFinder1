@@ -185,7 +185,7 @@ export default function Explore() {
             <button
               key={value}
               onClick={() => { setCoachingMode(value); setPage(1); }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all duration-150 active:scale-95 select-none ${
                 coachingMode === value
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background text-muted-foreground border-border hover:border-primary/50"
@@ -205,7 +205,7 @@ export default function Explore() {
             <button
               key={spec}
               onClick={() => toggleSpecialty(spec)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all duration-150 active:scale-95 select-none ${
                 selectedSpecialties.includes(spec)
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background text-muted-foreground border-border hover:border-primary/50"
@@ -332,7 +332,7 @@ export default function Explore() {
                   <button
                     key={spec}
                     onClick={() => toggleSpecialty(spec)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-all duration-150 active:scale-95 select-none ${
                       selectedSpecialties.includes(spec)
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"

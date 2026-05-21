@@ -1,8 +1,30 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Layout from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Check, ChevronRight, ShieldCheck, CreditCard, HelpCircle } from "lucide-react";
+
+function RevealSection({ children, delay = 0, className = "" }: {
+  children: React.ReactNode; delay?: number; className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect(); } },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={ref} style={{ transitionDelay: `${delay}ms` }} className={`reveal ${visible ? "in-view" : ""} ${className}`}>
+      {children}
+    </div>
+  );
+}
 
 const clientFeatures = [
   "Browse unlimited trainer profiles",
@@ -63,7 +85,7 @@ export default function Pricing() {
     <Layout>
       <section className="pt-20 pb-16 lg:pt-28 lg:pb-20">
         <div className="container mx-auto px-4 md:px-8">
-          <div className="text-center max-w-3xl mx-auto">
+          <div className="text-center max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-6 duration-600">
             <div className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold bg-secondary text-secondary-foreground mb-6" data-testid="badge-pricing">
               Pricing
             </div>
@@ -80,7 +102,8 @@ export default function Pricing() {
       <section className="pb-24">
         <div className="container mx-auto px-4 md:px-8">
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            <div className="bg-card border-2 border-primary rounded-3xl p-8 relative" data-testid="card-pricing-client">
+            <RevealSection delay={0}>
+            <div className="bg-card border-2 border-primary rounded-3xl p-8 relative transition-all duration-300 hover:shadow-xl hover:-translate-y-1" data-testid="card-pricing-client">
               <div className="absolute -top-3 left-8">
                 <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">Most Popular</span>
               </div>
@@ -106,8 +129,10 @@ export default function Pricing() {
                 </Button>
               </Link>
             </div>
+            </RevealSection>
 
-            <div className="bg-card border border-border rounded-3xl p-8" data-testid="card-pricing-trainer">
+            <RevealSection delay={120}>
+            <div className="bg-card border border-border rounded-3xl p-8 transition-all duration-300 hover:shadow-xl hover:-translate-y-1" data-testid="card-pricing-trainer">
               <div className="mb-8">
                 <h2 className="text-2xl font-bold mb-2">For Trainers</h2>
                 <div className="flex items-baseline gap-1">
@@ -129,6 +154,7 @@ export default function Pricing() {
                 </Button>
               </Link>
             </div>
+            </RevealSection>
           </div>
         </div>
       </section>
@@ -137,27 +163,33 @@ export default function Pricing() {
         <div className="container mx-auto px-4 md:px-8">
           <div className="max-w-4xl mx-auto">
             <div className="grid sm:grid-cols-3 gap-6 mb-16">
-              <div className="bg-background p-6 rounded-2xl border border-border text-center">
+              <RevealSection delay={0}>
+              <div className="bg-background p-6 rounded-2xl border border-border text-center hover:shadow-md transition-shadow duration-300">
                 <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
                   <CreditCard className="w-6 h-6" />
                 </div>
                 <h3 className="font-semibold mb-2">Pay per plan</h3>
                 <p className="text-sm text-muted-foreground">Only pay when you purchase a training plan. No monthly fees for anyone.</p>
               </div>
-              <div className="bg-background p-6 rounded-2xl border border-border text-center">
+              </RevealSection>
+              <RevealSection delay={100}>
+              <div className="bg-background p-6 rounded-2xl border border-border text-center hover:shadow-md transition-shadow duration-300">
                 <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <h3 className="font-semibold mb-2">Secure payments</h3>
                 <p className="text-sm text-muted-foreground">Every transaction is encrypted and processed through Stripe's secure infrastructure.</p>
               </div>
-              <div className="bg-background p-6 rounded-2xl border border-border text-center">
+              </RevealSection>
+              <RevealSection delay={200}>
+              <div className="bg-background p-6 rounded-2xl border border-border text-center hover:shadow-md transition-shadow duration-300">
                 <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
                   <HelpCircle className="w-6 h-6" />
                 </div>
                 <h3 className="font-semibold mb-2">No surprises</h3>
                 <p className="text-sm text-muted-foreground">Transparent pricing set by trainers. What you see on the plan is exactly what you pay.</p>
               </div>
+              </RevealSection>
             </div>
           </div>
         </div>
@@ -165,16 +197,18 @@ export default function Pricing() {
 
       <section className="py-24">
         <div className="container mx-auto px-4 md:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-12">
+          <RevealSection className="text-center max-w-2xl mx-auto mb-12">
             <h2 className="text-3xl font-bold mb-4">Pricing FAQ</h2>
             <p className="text-muted-foreground">Everything you need to know about costs on Fit Finder.</p>
-          </div>
+          </RevealSection>
           <div className="max-w-3xl mx-auto space-y-4">
             {pricingFaqs.map((faq, i) => (
-              <div key={i} className="bg-card border border-border rounded-2xl p-6" data-testid={`faq-pricing-${i}`}>
+              <RevealSection key={i} delay={i * 60}>
+              <div className="bg-card border border-border rounded-2xl p-6 hover:shadow-sm transition-shadow duration-200" data-testid={`faq-pricing-${i}`}>
                 <h3 className="font-semibold mb-2">{faq.q}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
               </div>
+              </RevealSection>
             ))}
           </div>
         </div>
@@ -182,6 +216,7 @@ export default function Pricing() {
 
       <section className="py-24 bg-muted/30">
         <div className="container mx-auto px-4 md:px-8 text-center">
+          <RevealSection>
           <h2 className="text-3xl font-bold mb-4">Start your fitness journey today.</h2>
           <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
             No subscription. No commitment. Just a better way to find the right trainer.
@@ -199,6 +234,7 @@ export default function Pricing() {
               </Button>
             </Link>
           </div>
+          </RevealSection>
         </div>
       </section>
     </Layout>
