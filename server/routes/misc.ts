@@ -137,7 +137,7 @@ router.post("/api/plans", requireAuth, async (req, res) => {
 const updatePlanSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
-  priceCents: z.number().int().min(0).optional(),
+  priceCents: z.number().int().min(50).optional(),
   billingType: z.enum(["ONE_TIME", "MONTHLY"]).optional(),
   isActive: z.boolean().optional(),
 });
@@ -190,6 +190,9 @@ router.get("/api/orders/trainer", requireAuth, async (req, res) => {
 router.post("/api/favorites/toggle", requireAuth, async (req, res) => {
   try {
     const { trainerId } = req.body;
+    if (!trainerId || typeof trainerId !== "string") {
+      return res.status(400).json({ message: "trainerId is required" });
+    }
     const isFav = await storage.toggleFavorite(req.session.userId!, trainerId);
     return res.json({ isFavorited: isFav });
   } catch (e) {

@@ -131,10 +131,11 @@ export default function Settings() {
     }
   }, [clientProfileData]);
 
-  if (!isAuthenticated) {
-    setLocation("/auth");
-    return null;
-  }
+  useEffect(() => {
+    if (!isAuthenticated) setLocation("/auth");
+  }, [isAuthenticated, setLocation]);
+
+  if (!isAuthenticated) return null;
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

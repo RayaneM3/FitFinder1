@@ -30,7 +30,7 @@ router.get("/api/stripe/connect", requireAuth, async (req, res) => {
 });
 
 router.get("/api/stripe/callback", async (req, res) => {
-  const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
+  const appUrl = process.env.FRONTEND_URL || process.env.APP_URL || `https://${req.headers.host}`;
   try {
     if (!stripe) return res.redirect(`${appUrl}/dashboard?stripe=error`);
     const { code, state: userId } = req.query as { code: string; state: string };
@@ -69,7 +69,7 @@ router.post("/api/checkout", requireAuth, async (req, res) => {
       return res.status(404).json({ message: "Plan not found or inactive" });
     }
 
-    const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
+    const appUrl = process.env.FRONTEND_URL || process.env.APP_URL || `https://${req.headers.host}`;
 
     if (!stripe) {
       const order = await storage.createOrder({

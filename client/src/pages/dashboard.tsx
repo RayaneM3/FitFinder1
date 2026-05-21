@@ -293,16 +293,109 @@ function ProfileStrength() {
 }
 
 function RecentActivity() {
+  const { user } = useAuth();
+  const isTrainer = user?.role === "TRAINER" || user?.role === "BOTH";
+  const isClient = user?.role === "CLIENT" || user?.role === "BOTH";
+
+  const { data: trainerData } = useQuery({
+    queryKey: ["/api/dashboard/trainer"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/api/dashboard/trainer`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: isTrainer,
+  });
+
+  const { data: clientData } = useQuery({
+    queryKey: ["/api/dashboard/client"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/api/dashboard/client`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: isClient,
+  });
+
+  type ActivityItem = { key: string; label: string; sub: string; time: Date; href: string };
+  const items: ActivityItem[] = [];
+
+  if (isTrainer && trainerData) {
+    (trainerData.leads || []).slice(0, 3).forEach((lead: any) => {
+      if (lead.lastMessage?.createdAt) {
+        items.push({
+          key: `lead-${lead.id}`,
+          label: `Message from ${lead.otherUser?.name || "a client"}`,
+          sub: lead.lastMessage.content?.slice(0, 60) || "New message",
+          time: new Date(lead.lastMessage.createdAt),
+          href: `/messages/${lead.id}`,
+        });
+      }
+    });
+    (trainerData.orders || []).slice(0, 3).forEach((order: any) => {
+      if (order.status === "PAID") {
+        items.push({
+          key: `order-${order.id}`,
+          label: `New purchase: ${order.planTitle || "Plan"}`,
+          sub: `by ${order.buyerName || "a client"}`,
+          time: new Date(order.createdAt),
+          href: "/dashboard",
+        });
+      }
+    });
+  }
+
+  if (isClient && clientData) {
+    (clientData.orders || []).slice(0, 3).forEach((order: any) => {
+      items.push({
+        key: `co-${order.id}`,
+        label: order.status === "PAID" ? `Purchased: ${order.planTitle || "Plan"}` : `Order: ${order.planTitle || "Plan"}`,
+        sub: `with ${order.trainerName || "trainer"} · ${order.status}`,
+        time: new Date(order.createdAt),
+        href: "/dashboard",
+      });
+    });
+  }
+
+  items.sort((a, b) => b.time.getTime() - a.time.getTime());
+  const shown = items.slice(0, 5);
+
+  const timeAgo = (d: Date) => {
+    const diff = Date.now() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
   return (
     <Card className="rounded-2xl border-border" data-testid="card-recent-activity">
       <CardHeader className="pb-2 pt-4 px-4">
         <CardTitle className="text-sm font-semibold">Recent Activity</CardTitle>
       </CardHeader>
       <CardContent className="px-4 pb-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground py-3" data-testid="text-no-activity">
-          <Clock className="w-3.5 h-3.5 shrink-0" />
-          <p>No activity yet. Once you start conversations or purchases, updates will appear here.</p>
-        </div>
+        {shown.length === 0 ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground py-3" data-testid="text-no-activity">
+            <Clock className="w-3.5 h-3.5 shrink-0" />
+            <p>No activity yet. Once you start conversations or purchases, updates will appear here.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {shown.map(item => (
+              <Link key={item.key} href={item.href}>
+                <div className="flex items-start gap-2.5 cursor-pointer hover:opacity-75 transition-opacity">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium leading-tight truncate">{item.label}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{item.sub}</p>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">{timeAgo(item.time)}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -342,8 +435,6 @@ function TrainerDashboard() {
     },
   });
 
-  const CreatePlanDialogCompact = () => null; // Placeholder for compact version
-
   const { data: stripeStatus } = useQuery({
     queryKey: ["/api/stripe/status"],
     queryFn: async () => {
@@ -373,7 +464,8 @@ function TrainerDashboard() {
 
   const hasPlans = !!myPlans?.length;
   const hasConversations = !!data?.leads?.length;
-  const revenue = ((data?.orders || []).filter((o: any) => o.status === "PAID").reduce((sum: number, o: any) => sum + o.amountCents, 0) / 100);
+  // Revenue shown after platform fee (87.2% of gross = 100% - 12.8% fee)
+  const revenue = ((data?.orders || []).filter((o: any) => o.status === "PAID").reduce((sum: number, o: any) => sum + o.amountCents, 0) * 0.872 / 100);
 
   if (isError) {
     return (
@@ -688,7 +780,7 @@ function OrderCard({ order }: { order: any }) {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
-  const [hasReviewed, setHasReviewed] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState<boolean>(order.hasReviewed ?? false);
 
   const reviewMutation = useMutation({
     mutationFn: async () => {

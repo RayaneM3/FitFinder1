@@ -68,14 +68,12 @@ export default function Onboarding() {
   const [acceptedTrainerAgreement, setAcceptedTrainerAgreement] = useState(false);
   const [acceptedClientWaiver, setAcceptedClientWaiver] = useState(false);
 
-  if (!user) {
-    setLocation("/auth");
-    return null;
-  }
-  if (user.onboardingComplete) {
-    setLocation("/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (!user) setLocation("/auth");
+    else if (user.onboardingComplete) setLocation("/dashboard");
+  }, [user, setLocation]);
+
+  if (!user || user.onboardingComplete) return null;
 
   const totalSteps = role === "BOTH" ? 4 : 3;
 

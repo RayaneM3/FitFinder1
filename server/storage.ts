@@ -547,6 +547,7 @@ export class DatabaseStorage implements IStorage {
       createdAt: orders.createdAt,
       planTitle: plans.title,
       trainerName: users.name,
+      hasReviewed: sql<boolean>`EXISTS(SELECT 1 FROM reviews WHERE order_id = ${orders.id})`,
     })
     .from(orders)
     .leftJoin(plans, eq(orders.planId, plans.id))
