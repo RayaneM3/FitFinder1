@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -28,14 +28,16 @@ export default function Auth() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  if (user) {
-    if (!user.onboardingComplete) {
-      setLocation("/onboarding");
-    } else {
-      setLocation("/dashboard");
+  useEffect(() => {
+    document.title = mode === "signin" ? "Sign In | Fit Finder" : "Create Account | Fit Finder";
+    return () => { document.title = "Fit Finder"; };
+  }, [mode]);
+
+  useEffect(() => {
+    if (user) {
+      setLocation(user.onboardingComplete ? "/dashboard" : "/onboarding");
     }
-    return null;
-  }
+  }, [user, setLocation]);
 
   const nameError = mode === "signup" && touched.name && name.trim().length < 1 ? "Name is required" : "";
   const emailError = touched.email && !isValidEmail(email) ? "Please enter a valid email address" : "";
