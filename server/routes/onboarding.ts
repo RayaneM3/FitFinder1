@@ -43,6 +43,10 @@ router.post("/api/onboarding/profile", requireAuth, async (req, res) => {
 
 router.post("/api/onboarding/trainer", requireAuth, async (req, res) => {
   try {
+    const user = await storage.getUser(req.session.userId!);
+    if (!user || (user.role !== "TRAINER" && user.role !== "BOTH")) {
+      return res.status(403).json({ message: "Only trainers can save a trainer profile" });
+    }
     const data = onboardingTrainerSchema.parse(req.body);
     await storage.upsertTrainerProfile({
       userId: req.session.userId!,
@@ -64,6 +68,10 @@ router.post("/api/onboarding/trainer", requireAuth, async (req, res) => {
 
 router.post("/api/onboarding/client", requireAuth, async (req, res) => {
   try {
+    const user = await storage.getUser(req.session.userId!);
+    if (!user || (user.role !== "CLIENT" && user.role !== "BOTH")) {
+      return res.status(403).json({ message: "Only clients can save a client profile" });
+    }
     const data = onboardingClientSchema.parse(req.body);
     await storage.upsertClientProfile({
       userId: req.session.userId!,
@@ -82,6 +90,12 @@ router.post("/api/onboarding/client", requireAuth, async (req, res) => {
 
 router.post("/api/onboarding/complete", requireAuth, async (req, res) => {
   try {
+    const user = await storage.getUser(req.session.userId!);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    // Ensure the user has chosen a role before marking onboarding complete
+    if (!user.role) {
+      return res.status(400).json({ message: "Please select a role before completing onboarding" });
+    }
     await storage.updateUser(req.session.userId!, { onboardingComplete: true });
     return res.json({ success: true });
   } catch (e: any) {

@@ -32,6 +32,11 @@ export async function uploadImage(
 
   const ext = matches[1] === "jpeg" ? "jpg" : matches[1];
   const buffer = Buffer.from(matches[2], "base64");
+
+  const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
+  if (buffer.length > MAX_BYTES) {
+    throw new Error(`Image too large (${(buffer.length / 1024 / 1024).toFixed(1)} MB). Maximum allowed is 8 MB.`);
+  }
   const hash = crypto.randomBytes(8).toString("hex");
   const key = `${folder}/${hash}.${ext}`;
 

@@ -3,6 +3,16 @@ import { requireAdmin } from "../middleware";
 import { pool } from "../db";
 import { storage } from "../storage";
 import { sendEmail } from "../email";
+import { deleteImage } from "../upload";
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 const router = Router();
 
@@ -108,10 +118,10 @@ router.post("/api/admin/users/:id/ban", requireAdmin, async (req, res) => {
       `UPDATE users SET "bannedAt" = now() WHERE id = $1`,
       [id]
     );
-    // Invalidate all sessions for this user
+    // Invalidate all sessions for this user using JSONB operator (safe, indexed)
     await pool.query(
-      `DELETE FROM session WHERE sess::text LIKE $1`,
-      [`%"userId":"${id}"%`]
+      `DELETE FROM session WHERE sess->>'userId' = $1`,
+      [id]
     );
     return res.json({ success: true });
   } catch (e) {
@@ -155,7 +165,7 @@ router.post("/api/admin/users/:id/warn", requireAdmin, async (req, res) => {
   </div>
   <div style="padding:32px 0;">
     <h2 style="margin:0 0 12px;font-size:20px;font-weight:600;">Account Warning</h2>
-    <p style="margin:0 0 16px;color:#4b5563;">Hi ${user.name || "there"},</p>
+    <p style="margin:0 0 16px;color:#4b5563;">Hi ${escapeHtml(user.name || "there")},</p>
     <p style="margin:0 0 16px;color:#4b5563;">Your account has received a warning from the Fit Finder moderation team.</p>
     <div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;border-radius:8px;margin:16px 0;">
       <p style="color:#92400e;margin:0;font-weight:500;">${reason.trim()}</p>
@@ -184,6 +194,10 @@ router.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
     if (id === req.session.userId) {
       return res.status(400).json({ message: "You cannot delete your own account" });
     }
+    // Fetch avatar URL before deletion so we can clean up R2
+    const userToDelete = await storage.getUser(id as string);
+    const avatarUrl = userToDelete?.image;
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -199,7 +213,8 @@ router.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
       await client.query(`DELETE FROM client_profiles WHERE user_id = $1`, [id]);
       await client.query(`DELETE FROM trainer_profiles WHERE user_id = $1`, [id]);
       await client.query(`DELETE FROM profiles WHERE user_id = $1`, [id]);
-      await client.query(`DELETE FROM session WHERE sess::text LIKE $1`, [`%"userId":"${id}"%`]);
+      // Invalidate sessions using JSONB operator (safe, no full table scan)
+      await client.query(`DELETE FROM session WHERE sess->>'userId' = $1`, [id]);
       await client.query(`DELETE FROM users WHERE id = $1`, [id]);
       await client.query("COMMIT");
     } catch (e) {
@@ -208,6 +223,12 @@ router.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
     } finally {
       client.release();
     }
+
+    // Clean up R2 avatar after DB deletion (best-effort)
+    if (avatarUrl) {
+      deleteImage(avatarUrl).catch((e) => console.error("[admin] Failed to delete avatar from R2:", e));
+    }
+
     return res.json({ success: true });
   } catch (e) {
     console.error("[DELETE /api/admin/users/:id]:", e);

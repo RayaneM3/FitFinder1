@@ -62,7 +62,7 @@ export function newMessageEmail(trainerName: string, clientName: string, message
   const safeClient = escapeHtml(clientName);
   const safePreview = escapeHtml(messagePreview.slice(0, 200)) + (messagePreview.length > 200 ? "..." : "");
 
-  const subject = `${clientName} sent you a message on Fit Finder`;
+  const subject = `${escapeHtml(clientName)} sent you a message on Fit Finder`;
   const html = emailWrapper(`
     <h2 style="margin: 0 0 12px; font-size: 20px; font-weight: 600;">Hi ${safeName},</h2>
     <p style="margin: 0 0 16px; color: #4b5563;">${safeClient} has reached out to you on Fit Finder. Here's a preview of their message:</p>

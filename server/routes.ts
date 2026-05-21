@@ -14,6 +14,7 @@ const PgSession = connectPgSimple(session);
 declare module "express-session" {
   interface SessionData {
     userId: string;
+    stripeOAuthState?: string;
   }
 }
 
@@ -40,8 +41,8 @@ export async function registerRoutes(
       { loc: "/explore", priority: "0.9" },
       { loc: "/auth", priority: "0.5" },
       { loc: "/how-it-works", priority: "0.6" },
-      { loc: "/privacy", priority: "0.3" },
-      { loc: "/terms", priority: "0.3" },
+      { loc: "/legal/privacy", priority: "0.3" },
+      { loc: "/legal/terms", priority: "0.3" },
     ];
 
     let trainerUrls: { loc: string; priority: string }[] = [];
@@ -118,17 +119,25 @@ ${allPages
       const orderId = session.metadata?.orderId;
       if (orderId) {
         try {
+          // Idempotency guard — Stripe retries webhooks on failure
+          const existingOrder = await storage.getOrder(orderId);
+          if (existingOrder?.status === "PAID") {
+            return res.json({ received: true }); // already processed
+          }
           await storage.updateOrderStatus(orderId, "PAID");
           console.log(`[webhook] Order ${orderId} marked as PAID`);
           // Send payment confirmation emails (fire-and-forget)
-          const order = await storage.getOrderByStripeSession(session.id);
+          const order = await storage.getOrder(orderId);
           if (order) {
             const buyer = await storage.getUser(order.buyerId);
             const trainer = await storage.getUser(order.trainerId);
             const plan = order.planId ? await storage.getPlan(order.planId) : null;
             if (buyer && trainer && plan) {
-              const amount = `$${(order.amountCents / 100).toFixed(2)}`;
-              const trainerAmount = `$${((order.amountCents * 0.872) / 100).toFixed(2)}`;
+              const currency = (order.currency || "usd").toUpperCase();
+              const fmt = (cents: number) =>
+                new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
+              const amount = fmt(order.amountCents);
+              const trainerAmount = fmt(order.amountCents * 0.872);
               const buyerEmail = orderPaidBuyerEmail(buyer.name, trainer.name, plan.title, amount);
               const trainerEmail = orderPaidTrainerEmail(trainer.name, buyer.name, plan.title, amount, trainerAmount);
               sendEmail(buyer.email, buyerEmail.subject, buyerEmail.html);
@@ -145,7 +154,11 @@ ${allPages
       const session = event.data.object as Stripe.Checkout.Session;
       const orderId = session.metadata?.orderId;
       if (orderId) {
-        await storage.updateOrderStatus(orderId, "CANCELED").catch(console.error);
+        // Guard: never cancel an order that was already PAID (race with completed event)
+        const order = await storage.getOrder(orderId).catch(() => null);
+        if (order && order.status !== "PAID") {
+          await storage.updateOrderStatus(orderId, "CANCELED").catch(console.error);
+        }
       }
     }
     return res.json({ received: true });

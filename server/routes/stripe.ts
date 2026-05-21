@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "../middleware";
 import { stripe, calculatePlatformFee } from "../stripe";
+import crypto from "crypto";
 
 const router = Router();
 
@@ -15,12 +16,15 @@ router.get("/api/stripe/connect", requireAuth, async (req, res) => {
       return res.status(403).json({ message: "Only trainers can connect Stripe" });
     }
     const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
+    // Generate a CSRF token and store it in the session for verification on callback
+    const csrfToken = crypto.randomBytes(24).toString("hex");
+    req.session.stripeOAuthState = csrfToken;
     const params = new URLSearchParams({
       response_type: "code",
       client_id: process.env.STRIPE_CLIENT_ID,
       scope: "read_write",
       redirect_uri: `${appUrl}/api/stripe/callback`,
-      state: req.session.userId!,
+      state: csrfToken,
     });
     return res.json({ url: `https://connect.stripe.com/oauth/authorize?${params.toString()}` });
   } catch (e) {
@@ -33,8 +37,17 @@ router.get("/api/stripe/callback", async (req, res) => {
   const appUrl = process.env.FRONTEND_URL || process.env.APP_URL || `https://${req.headers.host}`;
   try {
     if (!stripe) return res.redirect(`${appUrl}/dashboard?stripe=error`);
-    const { code, state: userId } = req.query as { code: string; state: string };
-    if (!code || !userId) return res.redirect(`${appUrl}/dashboard?stripe=error`);
+    const { code, state } = req.query as { code: string; state: string };
+    if (!code || !state) return res.redirect(`${appUrl}/dashboard?stripe=error`);
+    // Verify CSRF token stored when the OAuth flow was initiated
+    const expectedState = req.session.stripeOAuthState;
+    if (!expectedState || state !== expectedState) {
+      console.warn("[stripe/callback] CSRF state mismatch — possible CSRF attack");
+      return res.redirect(`${appUrl}/dashboard?stripe=error`);
+    }
+    delete req.session.stripeOAuthState;
+    const userId = req.session.userId;
+    if (!userId) return res.redirect(`${appUrl}/auth`);
     const response = await (stripe as any).oauth.token({ grant_type: "authorization_code", code });
     const stripeAccountId = response.stripe_user_id;
     if (!stripeAccountId) return res.redirect(`${appUrl}/dashboard?stripe=error`);
@@ -69,9 +82,18 @@ router.post("/api/checkout", requireAuth, async (req, res) => {
       return res.status(404).json({ message: "Plan not found or inactive" });
     }
 
+    // Prevent trainers from purchasing their own plans
+    if (plan.trainerId === req.session.userId!) {
+      return res.status(400).json({ message: "You cannot purchase your own training plan" });
+    }
+
     const appUrl = process.env.FRONTEND_URL || process.env.APP_URL || `https://${req.headers.host}`;
 
     if (!stripe) {
+      // Fake checkout is only allowed in non-production environments
+      if (process.env.NODE_ENV === "production") {
+        return res.status(503).json({ message: "Payment processing is not configured" });
+      }
       const order = await storage.createOrder({
         buyerId: req.session.userId!,
         trainerId: plan.trainerId,

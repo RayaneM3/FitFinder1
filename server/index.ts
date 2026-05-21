@@ -16,9 +16,13 @@ if (process.env.NODE_ENV === "production") {
 
 // CORS — allow frontend origin in split deployment
 const FRONTEND_URL = process.env.FRONTEND_URL; // e.g. https://fitfinder.vercel.app
+const APP_URL = process.env.APP_URL;
 app.use(
   cors({
-    origin: FRONTEND_URL || true, // true = reflect request origin in dev
+    // In production require an explicit FRONTEND_URL; in dev reflect origin
+    origin: process.env.NODE_ENV === "production"
+      ? (FRONTEND_URL || APP_URL || false)
+      : true,
     credentials: true,
   }),
 );

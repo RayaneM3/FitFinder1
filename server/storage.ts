@@ -582,14 +582,19 @@ export class DatabaseStorage implements IStorage {
 
   // --- Favorites ---
   async toggleFavorite(userId: string, trainerId: string) {
-    const existing = await db.select().from(favorites)
-      .where(and(eq(favorites.userId, userId), eq(favorites.trainerId, trainerId)));
-    if (existing.length > 0) {
-      await db.delete(favorites).where(and(eq(favorites.userId, userId), eq(favorites.trainerId, trainerId)));
-      return false;
+    // Use INSERT ... ON CONFLICT DO NOTHING to avoid race conditions.
+    // If the row already existed, the insert returns nothing → we delete it.
+    const inserted = await db
+      .insert(favorites)
+      .values({ userId, trainerId })
+      .onConflictDoNothing()
+      .returning();
+    if (inserted.length > 0) {
+      return true; // newly favorited
     }
-    await db.insert(favorites).values({ userId, trainerId });
-    return true;
+    // Row already existed — remove it (unfavorite)
+    await db.delete(favorites).where(and(eq(favorites.userId, userId), eq(favorites.trainerId, trainerId)));
+    return false;
   }
 
   async getFavorites(userId: string) {

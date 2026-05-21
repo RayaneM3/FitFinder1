@@ -127,31 +127,31 @@ const subPages: Record<
     title: "Payments & Refunds",
     icon: <CreditCard className="h-8 w-8" />,
     description:
-      "All payments on Fit Finder are processed securely through the platform. We hold funds in escrow until services are confirmed, protecting both clients and trainers.",
+      "All payments on Fit Finder are processed securely through Stripe. Your card details are never shared with trainers, and transparent pricing means no surprises.",
     sections: [
       {
         heading: "Secure Payments",
         content: [
           "All transactions are processed through Stripe with bank-level encryption.",
           "Your payment details are never shared with trainers.",
-          "Funds are held securely until you confirm the session or service has been delivered.",
-          "Trainers receive payouts on a regular schedule after service confirmation.",
+          "Trainers set their own pricing — what you see on the plan is exactly what you pay.",
+          "Trainers receive payouts on Stripe's standard payout schedule after purchase.",
         ],
       },
       {
         heading: "Refund Policy",
         content: [
-          "If a trainer cancels a session, you receive a full refund automatically.",
-          "Disputes can be raised within 7 days of a completed session.",
-          "Our support team mediates all disputes fairly and transparently.",
-          "Refunds are processed within 5-10 business days to your original payment method.",
+          "Refund policies are set by individual trainers — check with your trainer before purchasing.",
+          "If you have a dispute, contact our support team and we will help mediate.",
+          "Our support team responds within 24 hours on business days.",
+          "Refunds are processed by Stripe and typically take 5-10 business days.",
         ],
       },
     ],
     whatItMeans: [
-      "Your money is protected until you confirm services were delivered.",
+      "Your payment is processed securely through Stripe — no card details ever touch our servers.",
       "You never need to share payment info directly with a trainer.",
-      "Fair dispute resolution is always available if something goes wrong.",
+      "Support is available if something goes wrong with your purchase.",
     ],
   },
   "community-guidelines": {
@@ -206,7 +206,7 @@ const subPages: Record<
       {
         heading: "How to Reach Us",
         content: [
-          "Email: support@fitfinder.com",
+          "Email: support@fitfinder.co",
           "In-app: Settings → Help & Support → Contact Us",
           "For urgent safety concerns, use the \"Report\" feature for fastest response.",
           "Business hours: Monday–Friday, 9 AM – 6 PM GMT.",
@@ -254,7 +254,7 @@ const hubCards = [
   {
     slug: "payments-and-refunds",
     title: "Payments & Refunds",
-    description: "Secure transactions with escrow protection and fair refund policies.",
+    description: "Secure Stripe-powered payments with transparent pricing and fair refund support.",
     icon: <CreditCard className="h-6 w-6" />,
   },
   {

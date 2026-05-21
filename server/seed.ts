@@ -3,7 +3,7 @@ import { users, profiles, trainerProfiles } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { eq } from "drizzle-orm";
 
-const SEED_PASSWORD = "FitFinder2024!";
+const SEED_PASSWORD = process.env.SEED_PASSWORD || "FitFinder2024!";
 
 const seedTrainers = [
   {
@@ -142,21 +142,18 @@ export async function runSeedIfNeeded() {
     const alreadySeeded = existing.length > 0;
 
     if (alreadySeeded) {
-      // Trainers exist — just make sure the password is up to date
-      const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
-      for (const trainer of seedTrainers) {
-        await upsertTrainer(trainer, passwordHash);
-      }
-      console.log("[seed] All 8 demo trainers are up to date.");
-    } else {
-      console.log("[seed] Seeding 8 demo trainers for the first time...");
-      const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
-      for (const trainer of seedTrainers) {
-        await upsertTrainer(trainer, passwordHash);
-        console.log(`[seed]   ✓ ${trainer.name} (${trainer.city})`);
-      }
-      console.log("[seed] Done! Login: <email> / FitFinder2024!");
+      // Trainers already exist — skip bcrypt and upserts to avoid expensive startup work
+      console.log("[seed] Demo trainers already present — skipping seed.");
+      return;
     }
+
+    console.log("[seed] Seeding 8 demo trainers for the first time...");
+    const passwordHash = await bcrypt.hash(SEED_PASSWORD, 10);
+    for (const trainer of seedTrainers) {
+      await upsertTrainer(trainer, passwordHash);
+      console.log(`[seed]   ✓ ${trainer.name} (${trainer.city})`);
+    }
+    console.log("[seed] Done! Login: <email> / FitFinder2024!");
   } catch (e) {
     console.error("[seed] Failed:", e);
   }
