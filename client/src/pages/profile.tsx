@@ -147,11 +147,11 @@ export default function Profile() {
           </Button>
         </div>
 
-        <div className="bg-card border border-border rounded-3xl p-6 md:p-8 flex flex-col md:flex-row gap-8 items-start relative overflow-hidden shadow-sm">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 bg-card border border-border rounded-3xl p-6 md:p-8 flex flex-col md:flex-row gap-8 items-start relative overflow-hidden shadow-sm">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10" />
-          <div className="w-32 h-32 md:w-48 md:h-48 shrink-0 rounded-2xl overflow-hidden shadow-lg border-4 border-background relative bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+          <div className="w-32 h-32 md:w-48 md:h-48 shrink-0 rounded-2xl overflow-hidden shadow-lg border-4 border-background relative bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center group/avatar">
             {trainer.image ? (
-              <img src={trainer.image} alt={trainer.name} className="w-full h-full object-cover" data-testid="img-trainer-avatar" />
+              <img src={trainer.image} alt={trainer.name} className="w-full h-full object-cover transition-transform duration-500 group-hover/avatar:scale-105" data-testid="img-trainer-avatar" />
             ) : (
               <span className="text-5xl font-bold text-primary">{trainer.name?.charAt(0) || "T"}</span>
             )}
@@ -306,7 +306,7 @@ export default function Profile() {
               ) : (
                 <div className="grid md:grid-cols-2 gap-8">
                   {trainer.plans.map((plan: any, i: number) => (
-                    <div key={plan.id} className={`border ${i === 0 ? 'border-primary' : ''} rounded-3xl p-8 bg-card flex flex-col relative overflow-hidden hover:shadow-lg transition-shadow`}>
+                    <div key={plan.id} className={`border ${i === 0 ? 'border-primary shadow-primary/10 shadow-lg' : ''} rounded-3xl p-8 bg-card flex flex-col relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${i === 0 ? 'hover:shadow-primary/15' : ''}`} style={{ animationDelay: `${i * 100}ms` }}>
                       {i === 0 && (
                         <div className="absolute top-4 right-4 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">Featured</div>
                       )}

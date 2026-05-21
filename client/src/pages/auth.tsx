@@ -86,9 +86,9 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:flex lg:w-1/2 bg-primary items-center justify-center relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-primary items-center justify-center relative overflow-hidden animate-in fade-in duration-700">
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '32px 32px' }} />
-        <div className="relative z-10 max-w-md text-primary-foreground p-12">
+        <div className="relative z-10 max-w-md text-primary-foreground p-12 animate-in fade-in slide-in-from-left-6 duration-700 delay-200">
           <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl font-bold mb-8">F</div>
           <h1 className="text-4xl font-bold mb-4 tracking-tight">Find your perfect trainer.</h1>
           <p className="text-lg text-primary-foreground/80 leading-relaxed">
@@ -98,7 +98,7 @@ export default function Auth() {
       </div>
 
       <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="lg:hidden flex items-center gap-2 mb-10">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl">F</div>
             <span className="font-heading font-bold text-xl tracking-tight">Fit Finder</span>

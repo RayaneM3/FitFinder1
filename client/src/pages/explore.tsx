@@ -432,7 +432,9 @@ export default function Explore() {
             ) : (
               <>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {trainers.map((trainer: any) => <TrainerCard key={trainer.id} trainer={trainer} />)}
+                  {trainers.map((trainer: any, i: number) => (
+                    <TrainerCard key={trainer.id} trainer={trainer} index={i} />
+                  ))}
                 </div>
                 {trainers.length < total && (
                   <div className="mt-8 flex justify-center">
@@ -483,50 +485,57 @@ function PopularLocations({ onApply }: { onApply: (loc: typeof POPULAR_LOCATIONS
 
 function SkeletonCard() {
   return (
-    <div className="bg-card border border-border rounded-2xl overflow-hidden animate-pulse">
-      <div className="aspect-[4/3] bg-muted" />
+    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+      <div className="aspect-[4/3] animate-shimmer-card" />
       <div className="p-4 space-y-2.5">
         <div className="flex gap-2">
-          <div className="h-4 w-14 bg-muted rounded" />
-          <div className="h-4 w-18 bg-muted rounded" />
+          <div className="h-4 w-14 animate-shimmer-card rounded" />
+          <div className="h-4 w-18 animate-shimmer-card rounded" />
         </div>
-        <div className="h-3 w-20 bg-muted rounded" />
-        <div className="h-9 w-full bg-muted rounded-xl mt-3" />
+        <div className="h-3 w-20 animate-shimmer-card rounded mt-1" />
+        <div className="h-9 w-full animate-shimmer-card rounded-xl mt-3" />
       </div>
     </div>
   );
 }
 
-function TrainerCard({ trainer }: { trainer: any }) {
+function TrainerCard({ trainer, index = 0 }: { trainer: any; index?: number }) {
   const coachingLabel = trainer.coachingMode === "ONLINE" ? "Online" : trainer.coachingMode === "IN_PERSON" ? "In-Person" : "Hybrid";
   const specialties = trainer.specialties || [];
   const visibleSpecs = specialties.slice(0, 3);
   const extraCount = specialties.length - 3;
   const currency = getCurrencySymbol(trainer.country || "");
+  // Stagger each card's entrance by up to 350 ms, cycling every 6 cards
+  const staggerDelay = (index % 6) * 60;
 
   return (
-    <div className="bg-card border border-border rounded-2xl overflow-hidden hover:shadow-md transition-all duration-200 flex flex-col group" data-testid={`card-trainer-${trainer.id}`}>
+    <div
+      className="animate-in fade-in slide-in-from-bottom-3 duration-500 bg-card border border-border rounded-2xl overflow-hidden flex flex-col group transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+      style={{ animationDelay: `${staggerDelay}ms`, animationFillMode: "both" }}
+      data-testid={`card-trainer-${trainer.id}`}
+    >
       <Link href={`/profile/${trainer.id}`} className="block relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-primary/20 to-primary/5">
         {trainer.image ? (
           <img
             src={trainer.image}
             alt={trainer.name}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="trainer-img-zoom absolute inset-0 w-full h-full object-cover"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center transition-transform duration-500 group-hover:scale-110">
             <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-2xl font-bold text-primary">
               {trainer.name?.charAt(0) || "T"}
             </div>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
+        {/* Gradient darkens slightly on hover for legibility */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80 transition-opacity duration-300 group-hover:opacity-90" />
         <div className="absolute top-2.5 left-2.5">
           <Badge variant="secondary" className="bg-background/90 backdrop-blur text-foreground font-medium border-none shadow-sm text-[11px] px-2 py-0.5">
             {coachingLabel}
           </Badge>
         </div>
-        <div className="absolute bottom-3 left-3 right-3 text-white">
+        <div className="absolute bottom-3 left-3 right-3 text-white transition-transform duration-300 group-hover:translate-y-[-2px]">
           <h3 className="text-base font-bold tracking-tight mb-0.5" data-testid={`text-trainer-name-${trainer.id}`}>{trainer.name}</h3>
           <div className="flex items-center text-xs text-white/80">
             <MapPin className="w-3 h-3 mr-1" />
@@ -537,7 +546,7 @@ function TrainerCard({ trainer }: { trainer: any }) {
       <div className="p-3.5 flex flex-col flex-1">
         <div className="flex flex-wrap gap-1 mb-2.5">
           {visibleSpecs.map((spec: string) => (
-            <span key={spec} className="px-1.5 py-0.5 bg-secondary text-secondary-foreground text-[11px] font-medium rounded">{spec}</span>
+            <span key={spec} className="px-1.5 py-0.5 bg-secondary text-secondary-foreground text-[11px] font-medium rounded transition-colors duration-200 hover:bg-primary/10 hover:text-primary">{spec}</span>
           ))}
           {extraCount > 0 && (
             <span className="px-1.5 py-0.5 bg-muted text-muted-foreground text-[11px] font-medium rounded">+{extraCount}</span>
@@ -555,7 +564,12 @@ function TrainerCard({ trainer }: { trainer: any }) {
         </p>
         <div className="mt-2.5 pt-2.5 border-t">
           <Link href={`/profile/${trainer.id}`}>
-            <Button variant="outline" size="sm" className="w-full rounded-xl h-8 text-xs font-semibold" data-testid={`button-view-profile-${trainer.id}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full rounded-xl h-8 text-xs font-semibold transition-all duration-200 group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary"
+              data-testid={`button-view-profile-${trainer.id}`}
+            >
               View Profile
             </Button>
           </Link>

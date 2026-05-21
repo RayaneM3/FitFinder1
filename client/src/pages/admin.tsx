@@ -93,14 +93,18 @@ function AdminStats() {
 
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map((c) => (
-        <Card key={c.label} className="rounded-2xl">
+      {cards.map((c, i) => (
+        <Card
+          key={c.label}
+          className="animate-in fade-in slide-in-from-bottom-3 duration-500 rounded-2xl transition-shadow hover:shadow-md"
+          style={{ animationDelay: `${i * 80}ms`, animationFillMode: "both" }}
+        >
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">{c.label}</CardTitle>
             {c.icon}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{c.value}</div>
+            <div className="text-2xl font-bold tabular-nums">{c.value}</div>
           </CardContent>
         </Card>
       ))}

@@ -16,7 +16,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+
+/** Animates a number from 0 to `target` over `duration` ms. */
+function useCountUp(target: number, duration = 800): number {
+  const [count, setCount] = useState(0);
+  const prevTarget = useRef<number>(0);
+  useEffect(() => {
+    if (target === prevTarget.current) return;
+    const from = prevTarget.current;
+    prevTarget.current = target;
+    const start = Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(from + (target - from) * eased));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [target, duration]);
+  return count;
+}
 import { apiRequest, queryClient, API_BASE } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
@@ -47,8 +69,8 @@ export default function Dashboard() {
     <Layout>
       <div className="border-b">
         <div className="container mx-auto px-4 md:px-8 py-5">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-background shadow-sm bg-primary/10 flex items-center justify-center text-primary text-xl font-bold">
+          <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-500">
+            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-background shadow-sm bg-primary/10 flex items-center justify-center text-primary text-xl font-bold transition-transform duration-300 hover:scale-110">
               {user.name?.charAt(0) || "U"}
             </div>
             <div>
@@ -382,10 +404,13 @@ function RecentActivity() {
           </div>
         ) : (
           <div className="space-y-3">
-            {shown.map(item => (
+            {shown.map((item, idx) => (
               <Link key={item.key} href={item.href}>
-                <div className="flex items-start gap-2.5 cursor-pointer hover:opacity-75 transition-opacity">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                <div
+                  className="animate-in fade-in slide-in-from-left-2 duration-400 flex items-start gap-2.5 cursor-pointer hover:opacity-75 transition-opacity"
+                  style={{ animationDelay: `${idx * 60}ms`, animationFillMode: "both" }}
+                >
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0 animate-[pulse-dot_3s_ease-in-out_infinite]" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium leading-tight truncate">{item.label}</p>
                     <p className="text-[11px] text-muted-foreground truncate">{item.sub}</p>
@@ -405,9 +430,39 @@ function StatsSkeleton() {
   return (
     <div className="grid sm:grid-cols-3 gap-3">
       {[0, 1, 2].map(i => (
-        <div key={i} className="border rounded-xl p-4 animate-pulse">
-          <div className="h-3 w-16 bg-muted rounded mb-2" />
-          <div className="h-7 w-10 bg-muted rounded" />
+        <div key={i} className="border rounded-xl p-4">
+          <div className="h-3 w-16 animate-shimmer-card rounded mb-2" />
+          <div className="h-7 w-10 animate-shimmer-card rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TrainerStats({ leads, clients, revenue }: { leads: number; clients: number; revenue: number }) {
+  const animLeads   = useCountUp(leads);
+  const animClients = useCountUp(clients);
+  const animRevenue = useCountUp(Math.round(revenue));
+
+  return (
+    <div className="grid sm:grid-cols-3 gap-3">
+      {[
+        { icon: <MessageSquare className="w-3.5 h-3.5" />, label: "Leads",          value: animLeads,   prefix: "",  testid: "text-leads-count",   delay: 0   },
+        { icon: <Users className="w-3.5 h-3.5" />,         label: "Active Clients", value: animClients, prefix: "",  testid: "text-clients-count", delay: 80  },
+        { icon: <CreditCard className="w-3.5 h-3.5" />,    label: "Revenue",        value: animRevenue, prefix: "$", testid: "text-revenue",       delay: 160 },
+      ].map(stat => (
+        <div
+          key={stat.label}
+          className="animate-in fade-in slide-in-from-bottom-3 duration-500 border rounded-xl p-4 transition-shadow hover:shadow-md"
+          style={{ animationDelay: `${stat.delay}ms`, animationFillMode: "both" }}
+        >
+          <div className="flex items-center gap-2 mb-1 text-muted-foreground">
+            {stat.icon}
+            <p className="text-xs">{stat.label}</p>
+          </div>
+          <p className="text-2xl font-bold tabular-nums" data-testid={stat.testid}>
+            {stat.prefix}{stat.value}
+          </p>
         </div>
       ))}
     </div>
@@ -486,29 +541,11 @@ function TrainerDashboard() {
       )}
 
       {isLoading ? <StatsSkeleton /> : (
-        <div className="grid sm:grid-cols-3 gap-3">
-          <div className="border rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Leads</p>
-            </div>
-            <p className="text-2xl font-bold" data-testid="text-leads-count">{data?.leads?.length || 0}</p>
-          </div>
-          <div className="border rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="w-3.5 h-3.5 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Active Clients</p>
-            </div>
-            <p className="text-2xl font-bold" data-testid="text-clients-count">{data?.activeClients?.length || 0}</p>
-          </div>
-          <div className="border rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Revenue</p>
-            </div>
-            <p className="text-2xl font-bold" data-testid="text-revenue">${revenue.toFixed(0)}</p>
-          </div>
-        </div>
+        <TrainerStats
+          leads={data?.leads?.length || 0}
+          clients={data?.activeClients?.length || 0}
+          revenue={revenue}
+        />
       )}
 
       <div className="border-t pt-5">
