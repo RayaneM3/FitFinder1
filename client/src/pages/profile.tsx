@@ -175,11 +175,13 @@ export default function Profile() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {user?.id !== id && (
+                  <>
                 <Button
                   variant="outline"
                   size="icon"
                   className={`rounded-xl ${trainer.isFavorited ? 'text-red-500' : ''}`}
-                  onClick={() => favoriteMutation.mutate()}
+                  onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } favoriteMutation.mutate(); }}
                   data-testid="button-favorite"
                   aria-label={trainer.isFavorited ? "Remove from favorites" : "Add to favorites"}
                 >
@@ -220,6 +222,8 @@ export default function Profile() {
                     </div>
                   </DialogContent>
                 </Dialog>
+                  </>
+                )}
               </div>
             </div>
 
@@ -234,7 +238,7 @@ export default function Profile() {
               <Button
                 size="lg"
                 className="rounded-xl h-12 px-8 shadow-md"
-                onClick={() => requestChatMutation.mutate()}
+                onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } requestChatMutation.mutate(); }}
                 disabled={requestChatMutation.isPending || (user?.id === id)}
                 data-testid="button-request-chat"
               >
@@ -325,7 +329,7 @@ export default function Profile() {
                         <Button
                           className="w-full rounded-xl h-12 font-semibold"
                           variant={i === 0 ? "default" : "outline"}
-                          onClick={() => purchaseMutation.mutate(plan.id)}
+                          onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } purchaseMutation.mutate(plan.id); }}
                           disabled={purchaseMutation.isPending}
                           data-testid={`button-purchase-plan-${plan.id}`}
                         >
@@ -334,7 +338,7 @@ export default function Profile() {
                         <Button
                           className="w-full rounded-xl h-10 font-medium"
                           variant="ghost"
-                          onClick={() => requestChatMutation.mutate()}
+                          onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } requestChatMutation.mutate(); }}
                           disabled={requestChatMutation.isPending}
                           data-testid={`button-plan-chat-${plan.id}`}
                         >

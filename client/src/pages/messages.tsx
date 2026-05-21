@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import Layout from "@/components/layout/Layout";
 import { useAuth } from "@/lib/auth";
@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Send, MoreVertical, ShieldAlert, MessageCircle, Search, User, ArrowLeft, X, AlertCircle, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -14,6 +17,31 @@ import { apiRequest, queryClient, API_BASE } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { useWebSocket } from "@/hooks/use-websocket";
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+function formatMsgTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const yesterdayStr = new Date(now.getTime() - 86_400_000).toDateString();
+  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (date.toDateString() === todayStr) return time;
+  if (date.toDateString() === yesterdayStr) return `Yesterday ${time}`;
+  return `${date.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+}
+
+function formatConvoTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString())
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (date.toDateString() === new Date(now.getTime() - 86_400_000).toDateString())
+    return "Yesterday";
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+// ─── Skeletons ──────────────────────────────────────────────────────────────
 
 function ConversationSkeleton() {
   return (
@@ -32,24 +60,36 @@ function ConversationSkeleton() {
 
 function MessageSkeleton({ isMe }: { isMe: boolean }) {
   return (
-    <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} gap-1`}>
-      <Skeleton className={`h-10 ${isMe ? 'w-48' : 'w-56'} rounded-2xl`} />
+    <div className={`flex flex-col ${isMe ? "items-end" : "items-start"} gap-1`}>
+      <Skeleton className={`h-10 ${isMe ? "w-48" : "w-56"} rounded-2xl`} />
       <Skeleton className="h-2 w-12" />
     </div>
   );
 }
+
+// ─── Main component ─────────────────────────────────────────────────────────
 
 export default function Messages() {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const { user, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [message, setMessage] = useState("");
+
+  const [messageText, setMessageText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeConvoId, setActiveConvoId] = useState(conversationId || "");
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
+
+  // Report dialog state
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportCategory, setReportCategory] = useState("HARASSMENT");
+  const [reportDetails, setReportDetails] = useState("");
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  /** True when the user is within 80px of the bottom — controls auto-scroll. */
+  const wasAtBottomRef = useRef(true);
 
   useEffect(() => {
     document.title = "Messages | Fit Finder";
@@ -61,29 +101,39 @@ export default function Messages() {
   }, [conversationId]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setLocation("/auth");
-    }
+    if (!isAuthenticated) setLocation("/auth");
   }, [isAuthenticated, setLocation]);
+
+  // Track whether user is near the bottom so we know if auto-scroll is wanted
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    wasAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }, []);
+
+  // Auto-resize textarea as user types
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [messageText]);
 
   const { lastMessage: wsMessage } = useWebSocket(isAuthenticated);
 
-  // Handle WebSocket messages
   useEffect(() => {
     if (!wsMessage || wsMessage.type !== "new_message") return;
-
     if (wsMessage.conversationId === activeConvoId) {
-      // Append message to active conversation
       queryClient.setQueryData(["/api/messages", activeConvoId], (old: any[] | undefined) => {
         if (!old) return [wsMessage.message];
-        // Avoid duplicates
         if (old.some((m: any) => m.id === wsMessage.message.id)) return old;
         return [...old, wsMessage.message];
       });
     }
-    // Always refresh conversations list for unread counts
     queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
   }, [wsMessage, activeConvoId]);
+
+  // ── Queries ──────────────────────────────────────────────────────────────
 
   const { data: conversations, isLoading: convosLoading, isError: convosError } = useQuery({
     queryKey: ["/api/conversations"],
@@ -103,7 +153,6 @@ export default function Messages() {
       const res = await fetch(`${API_BASE}/api/messages?conversationId=${activeConvoId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load messages");
       const data = await res.json();
-      // If we got exactly 50, there might be older ones
       setHasOlderMessages(data.length === 50);
       return data;
     },
@@ -112,47 +161,51 @@ export default function Messages() {
     refetchIntervalInBackground: false,
   });
 
-  const loadOlderMessages = async () => {
-    if (!msgs?.length || loadingOlder) return;
-    setLoadingOlder(true);
-    try {
-      const oldest = msgs[0].createdAt;
-      const res = await fetch(`${API_BASE}/api/messages?conversationId=${activeConvoId}&before=${encodeURIComponent(oldest)}`, { credentials: "include" });
-      if (!res.ok) return;
-      const older: any[] = await res.json();
-      if (older.length < 50) setHasOlderMessages(false);
-      if (older.length === 0) return;
-      // Preserve scroll position while prepending
-      const container = scrollRef.current;
-      const prevHeight = container?.scrollHeight ?? 0;
-      queryClient.setQueryData(["/api/messages", activeConvoId], (prev: any[] | undefined) => {
-        if (!prev) return older;
-        const existingIds = new Set(prev.map((m: any) => m.id));
-        return [...older.filter((m: any) => !existingIds.has(m.id)), ...prev];
-      });
-      // Restore scroll so the view doesn't jump to top
-      requestAnimationFrame(() => {
-        if (container) {
-          container.scrollTop = container.scrollHeight - prevHeight;
-        }
-      });
-    } finally {
-      setLoadingOlder(false);
+  // ── Auto-scroll — only when user was already at the bottom ───────────────
+  useEffect(() => {
+    if (wasAtBottomRef.current && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  };
+  }, [msgs]);
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
 
   const sendMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/messages", { conversationId: activeConvoId, content: message });
+    mutationFn: async (content: string) => {
+      const res = await apiRequest("POST", "/api/messages", { conversationId: activeConvoId, content });
       return res.json();
     },
-    onSuccess: () => {
-      setMessage("");
-      queryClient.invalidateQueries({ queryKey: ["/api/messages", activeConvoId] });
+    onMutate: async (content: string) => {
+      const optimisticMsg = {
+        id: `optimistic-${Date.now()}`,
+        conversationId: activeConvoId,
+        senderId: user?.id,
+        content,
+        createdAt: new Date().toISOString(),
+        readAt: null,
+        _optimistic: true,
+      };
+      wasAtBottomRef.current = true; // always scroll to bottom after own send
+      queryClient.setQueryData(["/api/messages", activeConvoId], (old: any[] | undefined) =>
+        [...(old || []), optimisticMsg]
+      );
+      return { optimisticId: optimisticMsg.id, content };
+    },
+    onSuccess: (serverMsg, _, ctx) => {
+      queryClient.setQueryData(["/api/messages", activeConvoId], (old: any[] | undefined) => {
+        if (!old) return [serverMsg];
+        return old.map(m => m.id === ctx?.optimisticId ? serverMsg : m);
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
     },
-    onError: (err: any) => {
-      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    onError: (err: any, _, ctx) => {
+      // Remove optimistic message and restore text so user can retry
+      queryClient.setQueryData(["/api/messages", activeConvoId], (old: any[] | undefined) =>
+        (old || []).filter(m => m.id !== ctx?.optimisticId)
+      );
+      if (ctx?.content) setMessageText(ctx.content);
+      const msg = err.message?.includes(":") ? err.message.split(":").slice(1).join(":").trim() : err.message;
+      toast({ title: "Failed to send", description: msg, variant: "destructive" });
     },
   });
 
@@ -167,41 +220,80 @@ export default function Messages() {
     },
   });
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [msgs]);
+  const reportMutation = useMutation({
+    mutationFn: async ({ reportedId }: { reportedId: string }) => {
+      await apiRequest("POST", "/api/report", { reportedId, category: reportCategory, details: reportDetails });
+    },
+    onSuccess: () => {
+      toast({ title: "Report submitted", description: "We'll review this anonymously." });
+      setReportOpen(false);
+      setReportDetails("");
+      setReportCategory("HARASSMENT");
+    },
+    onError: (err: any) => {
+      const msg = err.message?.includes(":") ? err.message.split(":").slice(1).join(":").trim() : err.message;
+      toast({ title: "Report failed", description: msg, variant: "destructive" });
+    },
+  });
 
+  const loadOlderMessages = async () => {
+    if (!msgs?.length || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const oldest = msgs[0].createdAt;
+      const res = await fetch(
+        `${API_BASE}/api/messages?conversationId=${activeConvoId}&before=${encodeURIComponent(oldest)}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return;
+      const older: any[] = await res.json();
+      if (older.length < 50) setHasOlderMessages(false);
+      if (older.length === 0) return;
+      const container = scrollRef.current;
+      const prevHeight = container?.scrollHeight ?? 0;
+      queryClient.setQueryData(["/api/messages", activeConvoId], (prev: any[] | undefined) => {
+        if (!prev) return older;
+        const existingIds = new Set(prev.map((m: any) => m.id));
+        return [...older.filter((m: any) => !existingIds.has(m.id)), ...prev];
+      });
+      requestAnimationFrame(() => {
+        if (container) container.scrollTop = container.scrollHeight - prevHeight;
+      });
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
+  // Mark as read & reset older-messages flag when switching convos
   useEffect(() => {
     if (!activeConvoId) return;
     setHasOlderMessages(false);
+    wasAtBottomRef.current = true;
     apiRequest("POST", `/api/conversations/${activeConvoId}/read`, {})
       .catch(() => {})
-      .finally(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
-      });
+      .finally(() => queryClient.invalidateQueries({ queryKey: ["/api/conversations"] }));
   }, [activeConvoId]);
 
+  // Auto-select first conversation if none chosen
   useEffect(() => {
     if (!activeConvoId && conversations?.length > 0) {
       setActiveConvoId(conversations[0].id);
     }
   }, [conversations, activeConvoId]);
 
-  if (!isAuthenticated || !user) {
-    return null;
-  }
+  if (!isAuthenticated || !user) return null;
 
   const activeConvo = conversations?.find((c: any) => c.id === activeConvoId);
   const otherUser = activeConvo?.otherUser;
 
   const handleSend = () => {
-    if (!message.trim() || !activeConvoId) return;
-    sendMutation.mutate();
+    const content = messageText.trim();
+    if (!content || !activeConvoId || sendMutation.isPending) return;
+    setMessageText("");
+    sendMutation.mutate(content);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -210,11 +302,23 @@ export default function Messages() {
 
   const showList = !activeConvoId || !otherUser;
 
+  const filteredConversations = (conversations || []).filter((convo: any) => {
+    if (!searchQuery.trim()) return true;
+    const name = convo.otherUser?.name?.toLowerCase() || "";
+    const lastMsg = convo.lastMessage?.content?.toLowerCase() || "";
+    const q = searchQuery.toLowerCase().trim();
+    return name.includes(q) || lastMsg.includes(q);
+  });
+
   return (
     <Layout showFooter={false}>
       <div className="flex-1 flex overflow-hidden border-t" style={{ height: "calc(100vh - 64px)" }}>
-        {/* Sidebar — always visible on desktop, conditionally on mobile */}
-        <div className={`${showList ? 'flex' : 'hidden'} md:flex w-full md:w-80 lg:w-96 flex-col shrink-0 bg-muted/20`} style={{ boxShadow: "2px 0 8px -2px rgba(0,0,0,0.06)" }}>
+
+        {/* ── Conversation sidebar ─────────────────────────────────────── */}
+        <div
+          className={`${showList ? "flex" : "hidden"} md:flex w-full md:w-80 lg:w-96 flex-col shrink-0 bg-muted/20`}
+          style={{ boxShadow: "2px 0 8px -2px rgba(0,0,0,0.06)" }}
+        >
           <div className="p-4 border-b">
             <h2 className="text-xl font-bold mb-3" data-testid="text-messages-title">Messages</h2>
             <div className="relative">
@@ -223,7 +327,7 @@ export default function Messages() {
                 placeholder="Search messages..."
                 className="bg-background pl-9 pr-8"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 data-testid="input-search-messages"
                 aria-label="Search messages"
               />
@@ -238,14 +342,11 @@ export default function Messages() {
               )}
             </div>
           </div>
+
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
               {convosLoading ? (
-                <>
-                  <ConversationSkeleton />
-                  <ConversationSkeleton />
-                  <ConversationSkeleton />
-                </>
+                <><ConversationSkeleton /><ConversationSkeleton /><ConversationSkeleton /></>
               ) : convosError ? (
                 <div className="text-center py-8 px-6">
                   <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
@@ -253,58 +354,30 @@ export default function Messages() {
                   </div>
                   <p className="text-sm font-medium mb-1">Couldn't load conversations</p>
                   <p className="text-xs text-muted-foreground mb-3">Check your connection and try again.</p>
-                  <Button size="sm" variant="outline" className="rounded-lg" onClick={() => window.location.reload()}>
-                    Retry
-                  </Button>
+                  <Button size="sm" variant="outline" className="rounded-lg" onClick={() => window.location.reload()}>Retry</Button>
                 </div>
-              ) : (() => {
-                const filteredConversations = (conversations || []).filter((convo: any) => {
-                  if (!searchQuery.trim()) return true;
-                  const name = convo.otherUser?.name?.toLowerCase() || "";
-                  const lastMsg = convo.lastMessage?.content?.toLowerCase() || "";
-                  const query = searchQuery.toLowerCase().trim();
-                  return name.includes(query) || lastMsg.includes(query);
-                });
-
-                if (searchQuery.trim() && filteredConversations.length === 0) {
-                  return (
-                    <div className="text-center py-8 px-6">
-                      <p className="text-sm text-muted-foreground">No conversations matching "{searchQuery}"</p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="mt-2 rounded-xl"
-                        onClick={() => setSearchQuery("")}
-                      >
-                        Clear search
-                      </Button>
-                    </div>
-                  );
-                }
-
-                if (!conversations?.length) {
-                  return (
-                    <div className="text-center py-12 px-6">
-                      <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                        <MessageCircle className="h-7 w-7 text-muted-foreground/50" />
-                      </div>
-                      <p className="font-medium text-foreground mb-1">No messages yet</p>
-                      <p className="text-sm text-muted-foreground mb-4">When you contact a trainer, your conversations will appear here.</p>
-                      <Link href="/explore">
-                        <Button size="sm" className="rounded-lg" data-testid="button-find-trainers-sidebar">
-                          Find a Trainer
-                        </Button>
-                      </Link>
-                    </div>
-                  );
-                }
-
-                return filteredConversations.map((convo: any) => (
+              ) : !conversations?.length ? (
+                <div className="text-center py-12 px-6">
+                  <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                    <MessageCircle className="h-7 w-7 text-muted-foreground/50" />
+                  </div>
+                  <p className="font-medium text-foreground mb-1">No messages yet</p>
+                  <p className="text-sm text-muted-foreground mb-4">When you contact a trainer, your conversations will appear here.</p>
+                  <Link href="/explore">
+                    <Button size="sm" className="rounded-lg" data-testid="button-find-trainers-sidebar">Find a Trainer</Button>
+                  </Link>
+                </div>
+              ) : searchQuery.trim() && filteredConversations.length === 0 ? (
+                <div className="text-center py-8 px-6">
+                  <p className="text-sm text-muted-foreground">No conversations matching "{searchQuery}"</p>
+                  <Button variant="ghost" size="sm" className="mt-2 rounded-xl" onClick={() => setSearchQuery("")}>Clear search</Button>
+                </div>
+              ) : filteredConversations.map((convo: any) => (
                 <button
                   key={convo.id}
                   onClick={() => setActiveConvoId(convo.id)}
                   className={`w-full text-left p-3 rounded-xl flex items-start gap-3 transition-colors ${
-                    activeConvoId === convo.id ? 'bg-primary/10' : 'hover:bg-background'
+                    activeConvoId === convo.id ? "bg-primary/10" : "hover:bg-background"
                   }`}
                   data-testid={`conversation-${convo.id}`}
                 >
@@ -316,8 +389,8 @@ export default function Messages() {
                     <div className="flex justify-between items-center mb-1">
                       <h4 className="font-semibold text-sm truncate">{convo.otherUser?.name || "Unknown"}</h4>
                       {convo.lastMessage && (
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(convo.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <span className="text-xs text-muted-foreground shrink-0 ml-1">
+                          {formatConvoTime(convo.lastMessage.createdAt)}
                         </span>
                       )}
                     </div>
@@ -333,14 +406,13 @@ export default function Messages() {
                     </div>
                   </div>
                 </button>
-              ));
-              })()}
+              ))}
             </div>
           </ScrollArea>
         </div>
 
-        {/* Main chat area */}
-        <div className={`${showList ? 'hidden' : 'flex'} md:flex flex-1 flex-col bg-background`}>
+        {/* ── Main chat area ───────────────────────────────────────────── */}
+        <div className={`${showList ? "hidden" : "flex"} md:flex flex-1 flex-col bg-background`}>
           {!activeConvoId || !otherUser ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
               <div className="text-center max-w-xs">
@@ -350,21 +422,17 @@ export default function Messages() {
                 <p className="text-lg font-semibold text-foreground mb-1">Select a conversation</p>
                 <p className="text-sm text-muted-foreground mb-5">Or browse trainers to start chatting.</p>
                 <Link href="/explore">
-                  <Button className="rounded-lg mb-6" data-testid="button-find-trainers-main">
-                    Find Trainers
-                  </Button>
+                  <Button className="rounded-lg mb-6" data-testid="button-find-trainers-main">Find Trainers</Button>
                 </Link>
                 <div className="border rounded-xl p-4 text-left bg-muted/30">
                   <p className="text-xs font-semibold text-foreground mb-3">How it works</p>
                   <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">1</div>
-                      <p className="text-xs text-muted-foreground">Browse trainers and find your match</p>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">2</div>
-                      <p className="text-xs text-muted-foreground">Request to chat and start a conversation</p>
-                    </div>
+                    {["Browse trainers and find your match", "Request to chat and start a conversation"].map((step, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</div>
+                        <p className="text-xs text-muted-foreground">{step}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -388,9 +456,7 @@ export default function Messages() {
                     <AvatarImage src={otherUser.image || undefined} />
                     <AvatarFallback>{otherUser.name?.charAt(0) || "?"}</AvatarFallback>
                   </Avatar>
-                  <div>
-                    <h3 className="font-semibold" data-testid="text-chat-name">{otherUser.name}</h3>
-                  </div>
+                  <h3 className="font-semibold" data-testid="text-chat-name">{otherUser.name}</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <Link href={`/profile/${otherUser.id}`}>
@@ -401,11 +467,23 @@ export default function Messages() {
                   </Link>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-chat-menu" aria-label="Chat options menu"><MoreVertical className="w-5 h-5" /></Button>
+                      <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-chat-menu" aria-label="Chat options menu">
+                        <MoreVertical className="w-5 h-5" />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="text-destructive" onClick={() => blockMutation.mutate(otherUser.id)} data-testid="button-block-report">
-                        <ShieldAlert className="w-4 h-4 mr-2" /> Block & Report
+                      <DropdownMenuItem
+                        onClick={() => setReportOpen(true)}
+                        data-testid="button-report"
+                      >
+                        <ShieldAlert className="w-4 h-4 mr-2 text-amber-500" /> Report user
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => blockMutation.mutate(otherUser.id)}
+                        data-testid="button-block"
+                      >
+                        <ShieldAlert className="w-4 h-4 mr-2" /> Block user
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -413,7 +491,11 @@ export default function Messages() {
               </div>
 
               {/* Messages area */}
-              <div className="flex-1 overflow-y-auto p-6" ref={scrollRef}>
+              <div
+                className="flex-1 overflow-y-auto p-6"
+                ref={scrollRef}
+                onScroll={handleScroll}
+              >
                 <div className="flex justify-center mb-8">
                   <div className="bg-primary/5 text-primary text-xs font-medium px-4 py-2 rounded-full border border-primary/10 flex items-center gap-2">
                     <ShieldAlert className="w-3 h-3" />
@@ -469,13 +551,22 @@ export default function Messages() {
                     {(msgs || []).map((msg: any) => {
                       const isMe = msg.senderId === user?.id;
                       return (
-                        <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} gap-1`}>
-                          <div className={`${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'} p-3 rounded-2xl ${isMe ? 'rounded-tr-sm' : 'rounded-tl-sm'} max-w-[80%] md:max-w-[70%] text-sm`}>
+                        <div
+                          key={msg.id}
+                          className={`flex flex-col ${isMe ? "items-end" : "items-start"} gap-1 ${msg._optimistic ? "opacity-70" : ""}`}
+                        >
+                          <div
+                            className={`${
+                              isMe
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-foreground"
+                            } p-3 rounded-2xl ${isMe ? "rounded-tr-sm" : "rounded-tl-sm"} max-w-[80%] md:max-w-[70%] text-sm break-words`}
+                          >
                             {msg.content}
                           </div>
                           <span className="text-[10px] text-muted-foreground px-1">
-                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            {isMe && msg.readAt && " - Read"}
+                            {formatMsgTime(msg.createdAt)}
+                            {isMe && msg.readAt && " · Read"}
                           </span>
                         </div>
                       );
@@ -488,29 +579,86 @@ export default function Messages() {
               <div className="p-4 border-t bg-background">
                 <div className="flex items-end gap-2 bg-muted/50 rounded-2xl border p-2 focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all">
                   <textarea
-                    className="flex-1 bg-transparent border-0 resize-none max-h-32 min-h-[40px] p-2 text-sm focus:outline-none custom-scrollbar"
-                    placeholder="Type a message..."
-                    value={message}
-                    onChange={e => setMessage(e.target.value)}
+                    ref={textareaRef}
+                    className="flex-1 bg-transparent border-0 resize-none max-h-32 min-h-[40px] p-2 text-sm focus:outline-none"
+                    placeholder="Type a message… (Shift+Enter for new line)"
+                    value={messageText}
+                    onChange={e => setMessageText(e.target.value)}
                     onKeyDown={handleKeyDown}
                     rows={1}
                     data-testid="input-message"
                   />
                   <Button
                     size="icon"
-                    className="shrink-0 rounded-xl bg-primary hover:bg-primary/90 text-white"
+                    className="shrink-0 rounded-xl bg-primary hover:bg-primary/90 text-white disabled:opacity-40"
                     onClick={handleSend}
-                    disabled={!message.trim() || sendMutation.isPending}
+                    disabled={!messageText.trim() || sendMutation.isPending}
                     data-testid="button-send"
                   >
-                    <Send className="w-4 h-4" />
+                    {sendMutation.isPending
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Send className="w-4 h-4" />
+                    }
                   </Button>
                 </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5 px-1">
+                  {messageText.length > 4000
+                    ? <span className="text-destructive">{messageText.length}/5000</span>
+                    : messageText.length > 0
+                    ? `${messageText.length}/5000`
+                    : null}
+                </p>
               </div>
             </>
           )}
         </div>
       </div>
+
+      {/* Report dialog */}
+      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Report {otherUser?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Select value={reportCategory} onValueChange={setReportCategory}>
+              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="HARASSMENT">Harassment</SelectItem>
+                <SelectItem value="SPAM">Spam</SelectItem>
+                <SelectItem value="INAPPROPRIATE">Inappropriate Content</SelectItem>
+                <SelectItem value="SCAM">Scam</SelectItem>
+                <SelectItem value="OTHER">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <Textarea
+              value={reportDetails}
+              onChange={e => setReportDetails(e.target.value)}
+              placeholder="Describe what happened (optional)…"
+              className="rounded-xl"
+              maxLength={1000}
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl"
+                onClick={() => setReportOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1 rounded-xl"
+                onClick={() => otherUser && reportMutation.mutate({ reportedId: otherUser.id })}
+                disabled={reportMutation.isPending}
+              >
+                {reportMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Submit Report
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

@@ -7,9 +7,22 @@ import { uploadImage, deleteImage, R2_PUBLIC_URL } from "../upload";
 
 const router = Router();
 
+const profileSettingsSchema = z.object({
+  name:         z.string().min(1).max(60).optional(),
+  bio:          z.string().max(1000).optional(),
+  city:         z.string().max(80).optional(),
+  country:      z.string().max(60).optional(),
+  languages:    z.array(z.string().max(40)).max(10).optional(),
+  coachingMode: z.enum(["ONLINE", "IN_PERSON", "HYBRID"]).optional(),
+});
+
 router.patch("/api/settings/profile", requireAuth, async (req, res) => {
   try {
-    const { name, bio, city, country, languages, coachingMode } = req.body;
+    const parsed = profileSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0]?.message || "Validation error" });
+    }
+    const { name, bio, city, country, languages, coachingMode } = parsed.data;
     if (name) await storage.updateUser(req.session.userId!, { name });
     await storage.upsertProfile({
       userId: req.session.userId!,

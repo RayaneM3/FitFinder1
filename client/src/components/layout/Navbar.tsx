@@ -35,14 +35,21 @@ export default function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const unreadCount = useUnreadCount(isAuthenticated);
 
+  const navLink = (href: string) =>
+    `text-sm font-medium transition-all duration-200 border-b-2 pb-0.5 hover:text-primary ${
+      location === href || location.startsWith(href + "/")
+        ? "text-foreground border-primary"
+        : "text-muted-foreground border-transparent"
+    }`;
+
   const NavLinks = () => (
     <>
-      <Link href="/explore" className={`text-sm font-medium transition-colors hover:text-primary ${location === '/explore' ? 'text-foreground' : 'text-muted-foreground'}`} data-testid="link-explore">
+      <Link href="/explore" className={navLink("/explore")} data-testid="link-explore">
         Explore
       </Link>
       {isAuthenticated && (
         <>
-          <Link href="/messages" className={`relative text-sm font-medium transition-colors hover:text-primary ${location === '/messages' ? 'text-foreground' : 'text-muted-foreground'}`} data-testid="link-messages">
+          <Link href="/messages" className={`relative ${navLink("/messages")}`} data-testid="link-messages">
             Messages
             {unreadCount > 0 && (
               <span className="absolute -top-1.5 -right-3 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center" data-testid="badge-unread">
@@ -50,7 +57,7 @@ export default function Navbar() {
               </span>
             )}
           </Link>
-          <Link href="/dashboard" className={`text-sm font-medium transition-colors hover:text-primary ${location === '/dashboard' ? 'text-foreground' : 'text-muted-foreground'}`} data-testid="link-dashboard">
+          <Link href="/dashboard" className={navLink("/dashboard")} data-testid="link-dashboard">
             Dashboard
           </Link>
         </>
