@@ -2,6 +2,11 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "../middleware";
 import { sendEmail, newMessageEmail } from "../email";
+import { isUserOnline } from "../websocket";
+
+// Per-conversation email cooldown: don't spam more than once per 10 min
+const lastEmailSent = new Map<string, number>(); // key: `${userId}:${conversationId}`
+const EMAIL_COOLDOWN_MS = 10 * 60 * 1000;
 
 const router = Router();
 
@@ -75,7 +80,8 @@ router.get("/api/messages", requireAuth, async (req, res) => {
     }
 
     await storage.markMessagesRead(conversationId as string, userId);
-    const msgs = await storage.getMessages(conversationId as string);
+    const before = req.query.before as string | undefined;
+    const msgs = await storage.getMessages(conversationId as string, 50, before);
     return res.json(msgs);
   } catch (e) {
     console.error("[GET /api/messages]:", e);
@@ -111,19 +117,22 @@ router.post("/api/messages", requireAuth, async (req, res) => {
       content: content.trim(),
     });
 
-    // Send email notification for first message in conversation (fire-and-forget)
-    const allMsgs = await storage.getMessages(conversationId, 2);
-    if (allMsgs.length <= 1) {
-      const trainerUser = await storage.getUser(convo.trainerId);
-      const senderUser = await storage.getUser(userId);
-      if (trainerUser?.email && senderUser) {
-        const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
-        const { subject, html } = newMessageEmail(
-          trainerUser.name, senderUser.name, content.trim(),
-          `${appUrl}/messages/${conversationId}`
-        );
-        sendEmail(trainerUser.email, subject, html);
-      }
+    // Notify recipient via email if they're offline and cooldown has passed (fire-and-forget)
+    const recipientId = convo.clientId === userId ? convo.trainerId : convo.clientId;
+    const cooldownKey = `${recipientId}:${conversationId}`;
+    const lastSent = lastEmailSent.get(cooldownKey) ?? 0;
+    if (!isUserOnline(recipientId) && Date.now() - lastSent > EMAIL_COOLDOWN_MS) {
+      lastEmailSent.set(cooldownKey, Date.now());
+      Promise.all([storage.getUser(recipientId), storage.getUser(userId)]).then(([recipientUser, senderUser]) => {
+        if (recipientUser?.email && senderUser) {
+          const appUrl = process.env.FRONTEND_URL || process.env.APP_URL || `https://${req.headers.host}`;
+          const { subject, html } = newMessageEmail(
+            recipientUser.name, senderUser.name, content.trim(),
+            `${appUrl}/messages/${conversationId}`
+          );
+          sendEmail(recipientUser.email, subject, html);
+        }
+      }).catch(() => {});
     }
 
     return res.json(msg);

@@ -17,7 +17,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { Users, FileWarning, TrendingUp, ShieldAlert, MoreVertical, Loader2, AlertCircle } from "lucide-react";
+import { Users, FileWarning, TrendingUp, ShieldAlert, MoreVertical, Loader2, AlertCircle, Trash2, AlertTriangle } from "lucide-react";
 
 export default function Admin() {
   const { user, isAuthenticated } = useAuth();
@@ -221,6 +221,9 @@ function UsersTab() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [banTarget, setBanTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [warnTarget, setWarnTarget] = useState<{ id: string; name: string } | null>(null);
+  const [warnReason, setWarnReason] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -259,6 +262,31 @@ function UsersTab() {
       toast({ title: "User unbanned" });
     },
     onError: () => toast({ title: "Failed to unban user", variant: "destructive" }),
+  });
+
+  const warnMutation = useMutation({
+    mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
+      await apiRequest("POST", `/api/admin/users/${userId}/warn`, { reason });
+    },
+    onSuccess: () => {
+      toast({ title: "Warning sent via email" });
+      setWarnTarget(null);
+      setWarnReason("");
+    },
+    onError: () => toast({ title: "Failed to send warning", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("DELETE", `/api/admin/users/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "User deleted" });
+      setDeleteTarget(null);
+    },
+    onError: () => toast({ title: "Failed to delete user", variant: "destructive" }),
   });
 
   const roleBadge = (role: string | null) => {
@@ -322,49 +350,30 @@ function UsersTab() {
                   </td>
                   <td className="p-3">
                     {!u.isAdmin && (
-                      u.bannedAt ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-xl text-xs h-7"
-                          onClick={() => unbanMutation.mutate(u.id)}
-                          disabled={unbanMutation.isPending}
-                        >
-                          Unban
-                        </Button>
-                      ) : (
-                        <Dialog open={banTarget?.id === u.id} onOpenChange={(open) => !open && setBanTarget(null)}>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="rounded-xl text-xs h-7 text-destructive hover:text-destructive"
-                              onClick={() => setBanTarget({ id: u.id, name: u.name })}
-                            >
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => { setWarnTarget({ id: u.id, name: u.name }); setWarnReason(""); }}>
+                            <AlertTriangle className="w-4 h-4 mr-2 text-amber-500" /> Send Warning
+                          </DropdownMenuItem>
+                          {u.bannedAt ? (
+                            <DropdownMenuItem onClick={() => unbanMutation.mutate(u.id)} disabled={unbanMutation.isPending}>
+                              Unban
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem className="text-destructive" onClick={() => setBanTarget({ id: u.id, name: u.name })}>
                               Ban
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="rounded-2xl sm:max-w-sm">
-                            <DialogHeader>
-                              <DialogTitle>Ban {banTarget?.name}?</DialogTitle>
-                              <DialogDescription>
-                                This will immediately log them out and prevent them from signing in.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <DialogFooter className="gap-2">
-                              <Button variant="outline" onClick={() => setBanTarget(null)}>Cancel</Button>
-                              <Button
-                                variant="destructive"
-                                onClick={() => banTarget && banMutation.mutate(banTarget.id)}
-                                disabled={banMutation.isPending}
-                              >
-                                {banMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                Confirm Ban
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      )
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget({ id: u.id, name: u.name })}>
+                            <Trash2 className="w-4 h-4 mr-2" /> Delete Account
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </td>
                 </tr>
@@ -376,6 +385,68 @@ function UsersTab() {
           )}
         </div>
       )}
+
+      {/* Ban dialog */}
+      <Dialog open={!!banTarget} onOpenChange={(open) => !open && setBanTarget(null)}>
+        <DialogContent className="rounded-2xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Ban {banTarget?.name}?</DialogTitle>
+            <DialogDescription>This will immediately log them out and prevent them from signing in.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBanTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => banTarget && banMutation.mutate(banTarget.id)} disabled={banMutation.isPending}>
+              {banMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirm Ban
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Warn dialog */}
+      <Dialog open={!!warnTarget} onOpenChange={(open) => !open && setWarnTarget(null)}>
+        <DialogContent className="rounded-2xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Warn {warnTarget?.name}</DialogTitle>
+            <DialogDescription>A warning email will be sent to this user explaining the reason.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Input
+              placeholder="Reason (e.g. 'Posting inappropriate content')"
+              value={warnReason}
+              onChange={e => setWarnReason(e.target.value)}
+              className="rounded-xl"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setWarnTarget(null)}>Cancel</Button>
+            <Button
+              onClick={() => warnTarget && warnMutation.mutate({ userId: warnTarget.id, reason: warnReason })}
+              disabled={warnMutation.isPending || !warnReason.trim()}
+            >
+              {warnMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Send Warning
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="rounded-2xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
+            <DialogDescription>This permanently deletes their account, messages, orders, and all data. This cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Delete Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

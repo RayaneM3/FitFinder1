@@ -6,6 +6,11 @@ import { pool } from "./db";
 
 const connections = new Map<string, Set<WebSocket>>();
 
+export function isUserOnline(userId: string): boolean {
+  const userConns = connections.get(userId);
+  return !!userConns && userConns.size > 0;
+}
+
 export function broadcastToUser(userId: string, payload: object) {
   const userConns = connections.get(userId);
   if (!userConns) return;

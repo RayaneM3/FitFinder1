@@ -2,10 +2,19 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { exploreFiltersSchema } from "@shared/schema";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 
 const router = Router();
 
-router.get("/api/trainers", async (req, res) => {
+const trainersLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60, // 60 requests per minute per IP
+  message: { message: "Too many requests. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.get("/api/trainers", trainersLimiter, async (req, res) => {
   try {
     const specialtiesParam = req.query.specialties as string | undefined;
     const filters = exploreFiltersSchema.parse({

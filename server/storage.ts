@@ -1,4 +1,4 @@
-import { eq, and, or, ilike, gte, lte, desc, asc, ne, sql, notInArray, inArray } from "drizzle-orm";
+import { eq, and, or, ilike, gte, lte, lt, desc, asc, ne, sql, notInArray, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { broadcastToUser } from "./websocket";
 import {
@@ -421,7 +421,10 @@ export class DatabaseStorage implements IStorage {
 
   // --- Messages ---
   async getMessages(conversationId: string, limit = 50, before?: string) {
-    const conditions = [eq(messages.conversationId, conversationId)];
+    const conditions: ReturnType<typeof eq>[] = [eq(messages.conversationId, conversationId)];
+    if (before) {
+      conditions.push(lt(messages.createdAt, new Date(before)));
+    }
     const results = await db.select().from(messages)
       .where(and(...conditions))
       .orderBy(desc(messages.createdAt))

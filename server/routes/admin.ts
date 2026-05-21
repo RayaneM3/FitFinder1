@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { requireAdmin } from "../middleware";
 import { pool } from "../db";
+import { storage } from "../storage";
+import { sendEmail } from "../email";
 
 const router = Router();
 
@@ -130,6 +132,86 @@ router.post("/api/admin/users/:id/unban", requireAdmin, async (req, res) => {
   } catch (e) {
     console.error("[POST /api/admin/users/:id/unban]:", e);
     return res.status(500).json({ message: "Failed to unban user" });
+  }
+});
+
+// POST /api/admin/users/:id/warn
+router.post("/api/admin/users/:id/warn", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    if (!reason?.trim()) return res.status(400).json({ message: "reason is required" });
+    const user = await storage.getUser(id as string);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const FRONTEND_URL = process.env.FRONTEND_URL || process.env.APP_URL || "https://fitfinder.co";
+    const html = `
+<div style="max-width:560px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;line-height:1.6;">
+  <div style="padding:24px 0;border-bottom:1px solid #e5e5e5;">
+    <div style="display:inline-flex;align-items:center;gap:8px;">
+      <div style="width:28px;height:28px;border-radius:6px;background:#3b82f6;color:white;font-weight:bold;font-size:16px;text-align:center;line-height:28px;">F</div>
+      <span style="font-weight:600;font-size:16px;">Fit Finder</span>
+    </div>
+  </div>
+  <div style="padding:32px 0;">
+    <h2 style="margin:0 0 12px;font-size:20px;font-weight:600;">Account Warning</h2>
+    <p style="margin:0 0 16px;color:#4b5563;">Hi ${user.name || "there"},</p>
+    <p style="margin:0 0 16px;color:#4b5563;">Your account has received a warning from the Fit Finder moderation team.</p>
+    <div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;border-radius:8px;margin:16px 0;">
+      <p style="color:#92400e;margin:0;font-weight:500;">${reason.trim()}</p>
+    </div>
+    <p style="margin:0 0 16px;color:#4b5563;">Please review our <a href="${FRONTEND_URL}/legal/community-guidelines" style="color:#3b82f6;">Community Guidelines</a>. Repeated violations may result in account suspension.</p>
+    <p style="margin:0;color:#6b7280;font-size:13px;">If you believe this is a mistake, reply to this email.</p>
+  </div>
+  <div style="padding:20px 0;border-top:1px solid #e5e5e5;font-size:12px;color:#6b7280;">
+    <p style="margin:0;">You're receiving this because you have an account on Fit Finder.</p>
+    <p style="margin:4px 0 0;">Questions? Contact support@fitfinder.co</p>
+  </div>
+</div>`;
+
+    await sendEmail(user.email, "Fit Finder account warning", html);
+    return res.json({ success: true });
+  } catch (e) {
+    console.error("[POST /api/admin/users/:id/warn]:", e);
+    return res.status(500).json({ message: "Failed to send warning" });
+  }
+});
+
+// DELETE /api/admin/users/:id
+router.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (id === req.session.userId) {
+      return res.status(400).json({ message: "You cannot delete your own account" });
+    }
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`DELETE FROM messages WHERE sender_id = $1`, [id]);
+      await client.query(`DELETE FROM conversations WHERE client_id = $1 OR trainer_id = $1`, [id]);
+      await client.query(`DELETE FROM orders WHERE buyer_id = $1 OR trainer_id = $1`, [id]);
+      await client.query(`DELETE FROM reviews WHERE reviewer_id = $1 OR trainer_id = $1`, [id]);
+      await client.query(`DELETE FROM favorites WHERE user_id = $1 OR trainer_id = $1`, [id]);
+      await client.query(`DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`, [id]);
+      await client.query(`DELETE FROM reports WHERE reporter_id = $1 OR reported_id = $1`, [id]);
+      await client.query(`DELETE FROM legal_acceptances WHERE user_id = $1`, [id]);
+      await client.query(`DELETE FROM password_reset_tokens WHERE user_id = $1`, [id]);
+      await client.query(`DELETE FROM client_profiles WHERE user_id = $1`, [id]);
+      await client.query(`DELETE FROM trainer_profiles WHERE user_id = $1`, [id]);
+      await client.query(`DELETE FROM profiles WHERE user_id = $1`, [id]);
+      await client.query(`DELETE FROM session WHERE sess::text LIKE $1`, [`%"userId":"${id}"%`]);
+      await client.query(`DELETE FROM users WHERE id = $1`, [id]);
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+    return res.json({ success: true });
+  } catch (e) {
+    console.error("[DELETE /api/admin/users/:id]:", e);
+    return res.status(500).json({ message: "Failed to delete user" });
   }
 });
 

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, SlidersHorizontal, X, Sparkles, UserSearch, Dumbbell, ChevronRight, TrendingUp, Globe, Star, AlertCircle } from "lucide-react";
+import { Search, MapPin, SlidersHorizontal, X, Sparkles, UserSearch, Dumbbell, ChevronRight, TrendingUp, Globe, Star, AlertCircle, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -77,7 +77,9 @@ export default function Explore() {
     return params;
   }, [debouncedSearch, city, country, coachingMode, selectedSpecialties, priceRange, language, sort, page]);
 
-  const { data, isLoading, isError } = useQuery({
+  const [allTrainers, setAllTrainers] = useState<any[]>([]);
+
+  const { data, isLoading, isFetching, isError } = useQuery({
     queryKey: ["/api/trainers", queryParams.toString()],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/trainers?${queryParams.toString()}`);
@@ -86,7 +88,26 @@ export default function Explore() {
     },
   });
 
-  const trainers = data?.trainers || [];
+  useEffect(() => {
+    if (!data?.trainers) return;
+    if (page === 1) {
+      setAllTrainers(data.trainers);
+    } else {
+      setAllTrainers(prev => {
+        const existingIds = new Set(prev.map((t: any) => t.id));
+        const newOnes = data.trainers.filter((t: any) => !existingIds.has(t.id));
+        return [...prev, ...newOnes];
+      });
+    }
+  }, [data]);
+
+  // Reset accumulated list whenever filters change (page resets to 1)
+  useEffect(() => {
+    setAllTrainers([]);
+    setPage(1);
+  }, [debouncedSearch, city, country, coachingMode, selectedSpecialties.join(","), priceRange.join(","), language, sort]);
+
+  const trainers = allTrainers;
   const total = data?.total || 0;
 
   const clearAllFilters = () => {
@@ -415,7 +436,16 @@ export default function Explore() {
                 </div>
                 {trainers.length < total && (
                   <div className="mt-8 flex justify-center">
-                    <Button variant="outline" className="rounded-full px-8" onClick={() => setPage(p => p + 1)} data-testid="button-load-more">Load More</Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-full px-8"
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={isFetching}
+                      data-testid="button-load-more"
+                    >
+                      {isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                      Load More
+                    </Button>
                   </div>
                 )}
               </>

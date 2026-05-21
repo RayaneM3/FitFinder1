@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Send, MoreVertical, ShieldAlert, MessageCircle, Search, User, ArrowLeft, X, AlertCircle } from "lucide-react";
+import { Send, MoreVertical, ShieldAlert, MessageCircle, Search, User, ArrowLeft, X, AlertCircle, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, API_BASE } from "@/lib/queryClient";
@@ -47,6 +47,8 @@ export default function Messages() {
   const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeConvoId, setActiveConvoId] = useState(conversationId || "");
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -100,12 +102,44 @@ export default function Messages() {
       if (!activeConvoId) return [];
       const res = await fetch(`${API_BASE}/api/messages?conversationId=${activeConvoId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load messages");
-      return res.json();
+      const data = await res.json();
+      // If we got exactly 50, there might be older ones
+      setHasOlderMessages(data.length === 50);
+      return data;
     },
     enabled: !!activeConvoId,
     refetchInterval: 30000,
     refetchIntervalInBackground: false,
   });
+
+  const loadOlderMessages = async () => {
+    if (!msgs?.length || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const oldest = msgs[0].createdAt;
+      const res = await fetch(`${API_BASE}/api/messages?conversationId=${activeConvoId}&before=${encodeURIComponent(oldest)}`, { credentials: "include" });
+      if (!res.ok) return;
+      const older: any[] = await res.json();
+      if (older.length < 50) setHasOlderMessages(false);
+      if (older.length === 0) return;
+      // Preserve scroll position while prepending
+      const container = scrollRef.current;
+      const prevHeight = container?.scrollHeight ?? 0;
+      queryClient.setQueryData(["/api/messages", activeConvoId], (prev: any[] | undefined) => {
+        if (!prev) return older;
+        const existingIds = new Set(prev.map((m: any) => m.id));
+        return [...older.filter((m: any) => !existingIds.has(m.id)), ...prev];
+      });
+      // Restore scroll so the view doesn't jump to top
+      requestAnimationFrame(() => {
+        if (container) {
+          container.scrollTop = container.scrollHeight - prevHeight;
+        }
+      });
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   const sendMutation = useMutation({
     mutationFn: async () => {
@@ -141,6 +175,7 @@ export default function Messages() {
 
   useEffect(() => {
     if (!activeConvoId) return;
+    setHasOlderMessages(false);
     apiRequest("POST", `/api/conversations/${activeConvoId}/read`, {})
       .catch(() => {})
       .finally(() => {
@@ -385,6 +420,21 @@ export default function Messages() {
                     Safety: Keep communication on the platform. Don't share exact addresses immediately.
                   </div>
                 </div>
+
+                {hasOlderMessages && !msgsLoading && (
+                  <div className="flex justify-center mb-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full text-xs px-4"
+                      onClick={loadOlderMessages}
+                      disabled={loadingOlder}
+                    >
+                      {loadingOlder ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                      Load earlier messages
+                    </Button>
+                  </div>
+                )}
 
                 {msgsLoading ? (
                   <div className="space-y-4">

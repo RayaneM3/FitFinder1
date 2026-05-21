@@ -11,9 +11,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, API_BASE } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Trash2, Camera, Plus, X, AlertTriangle } from "lucide-react";
+import { Loader2, Trash2, Camera, Plus, X, AlertTriangle, ExternalLink, CheckCircle2, CreditCard } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 
 const LANGUAGES = ["English", "Spanish", "French", "Mandarin", "Hindi", "Russian", "Portuguese", "Arabic", "German", "Japanese"];
@@ -56,6 +56,16 @@ export default function Settings() {
   const { data: blockedUsers } = useQuery<any[]>({
     queryKey: ["/api/blocked"],
     enabled: isAuthenticated,
+  });
+
+  const { data: stripeStatus } = useQuery<{ connected: boolean; accountId: string | null }>({
+    queryKey: ["/api/stripe/status"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/api/stripe/status`, { credentials: "include" });
+      if (!res.ok) return { connected: false, accountId: null };
+      return res.json();
+    },
+    enabled: isAuthenticated && isTrainer,
   });
 
   const [name, setName] = useState("");
@@ -256,8 +266,8 @@ export default function Settings() {
     setCertifications(prev => prev.filter(c => c !== cert));
   };
 
-  const tabCount = 3 + (isTrainer ? 1 : 0) + (isClient ? 1 : 0);
-  const gridCols = tabCount === 3 ? "grid-cols-3" : tabCount === 4 ? "grid-cols-4" : "grid-cols-5";
+  const tabCount = 3 + (isTrainer ? 2 : 0) + (isClient ? 1 : 0);
+  const gridCols = tabCount === 3 ? "grid-cols-3" : tabCount === 4 ? "grid-cols-4" : tabCount === 5 ? "grid-cols-5" : "grid-cols-6";
 
   if (profileLoading) {
     return (
@@ -289,6 +299,7 @@ export default function Settings() {
             <TabsTrigger value="security" className="rounded-lg">Security</TabsTrigger>
             <TabsTrigger value="blocked" className="rounded-lg">Blocked</TabsTrigger>
             {isTrainer && <TabsTrigger value="trainer" className="rounded-lg">Trainer</TabsTrigger>}
+            {isTrainer && <TabsTrigger value="payments" className="rounded-lg">Payments</TabsTrigger>}
             {isClient && <TabsTrigger value="client" className="rounded-lg">Client</TabsTrigger>}
           </TabsList>
 
@@ -417,6 +428,36 @@ export default function Settings() {
           {/* Trainer Profile Tab */}
           {isTrainer && (
             <TabsContent value="trainer" className="space-y-6">
+              {/* Completeness score */}
+              {(() => {
+                const checks = [
+                  { label: "Profile photo", done: !!user?.image },
+                  { label: "Bio", done: !!(profile?.profile?.bio?.trim()) },
+                  { label: "City & country", done: !!(profile?.profile?.city?.trim() && profile?.profile?.country?.trim()) },
+                  { label: "At least 1 specialty", done: specialties.length > 0 },
+                  { label: "Pricing set", done: priceMin > 0 && priceMax > 0 },
+                  { label: "Availability notes", done: !!(availabilityNotes?.trim()) },
+                  { label: "At least 1 certification", done: certifications.length > 0 },
+                ];
+                const done = checks.filter(c => c.done).length;
+                const pct = Math.round((done / checks.length) * 100);
+                const missing = checks.filter(c => !c.done);
+                if (pct === 100) return null;
+                return (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-amber-800">Profile {pct}% complete</p>
+                      <span className="text-xs text-amber-700">{done}/{checks.length} items</span>
+                    </div>
+                    <div className="w-full bg-amber-100 rounded-full h-2">
+                      <div className="bg-amber-500 h-2 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-xs text-amber-700">
+                      Still missing: {missing.map(c => c.label).join(" · ")}
+                    </p>
+                  </div>
+                );
+              })()}
               <div className="space-y-2">
                 <Label>Specialties</Label>
                 <div className="flex flex-wrap gap-2">
@@ -481,6 +522,69 @@ export default function Settings() {
                 {savingTrainer && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Trainer Profile
               </Button>
+            </TabsContent>
+          )}
+
+          {/* Payments Tab */}
+          {isTrainer && (
+            <TabsContent value="payments" className="space-y-6">
+              <div className="rounded-2xl border p-6 space-y-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <CreditCard className="w-5 h-5 text-muted-foreground" />
+                  <h3 className="font-semibold text-base">Stripe Connect</h3>
+                </div>
+                {stripeStatus?.connected ? (
+                  <>
+                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span className="font-medium">Your Stripe account is connected and ready to receive payments.</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Payouts are deposited on Stripe's standard schedule (typically 2 business days). The platform retains a 12.8% fee per transaction.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <a
+                        href="https://dashboard.stripe.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button variant="outline" className="rounded-xl gap-2">
+                          <ExternalLink className="w-4 h-4" />
+                          Open Stripe Dashboard
+                        </Button>
+                      </a>
+                      <a
+                        href="https://dashboard.stripe.com/balance/overview"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button variant="ghost" className="rounded-xl gap-2 text-muted-foreground">
+                          <ExternalLink className="w-4 h-4" />
+                          View Payouts
+                        </Button>
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Connect your Stripe account to start accepting payments from clients. You'll receive payouts directly to your bank account on Stripe's standard schedule.
+                    </p>
+                    <a href="/api/stripe/connect">
+                      <Button className="rounded-xl gap-2">
+                        <CreditCard className="w-4 h-4" />
+                        Connect Stripe Account
+                      </Button>
+                    </a>
+                  </>
+                )}
+              </div>
+              <div className="rounded-2xl border p-5 bg-muted/30 text-sm text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground">Fee breakdown</p>
+                <p>• Platform fee: <span className="font-medium text-foreground">12.8%</span> per transaction</p>
+                <p>• Stripe processing: <span className="font-medium text-foreground">~2.9% + 30¢</span> (deducted by Stripe)</p>
+                <p>• You keep the remainder, paid on Stripe's standard payout schedule.</p>
+              </div>
             </TabsContent>
           )}
 
