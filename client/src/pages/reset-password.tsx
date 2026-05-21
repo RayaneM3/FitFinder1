@@ -80,9 +80,9 @@ export default function ResetPassword() {
     return (
       <Layout>
         <div className="min-h-[60vh] flex items-center justify-center py-16 px-4">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="mb-6">
-              <Link href="/auth" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+              <Link href="/auth" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Back to sign in
               </Link>
             </div>
@@ -93,8 +93,8 @@ export default function ResetPassword() {
             </p>
 
             {requestSent ? (
-              <div className="flex flex-col items-center text-center py-8 gap-4">
-                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+              <div className="flex flex-col items-center text-center py-8 gap-4 animate-in fade-in zoom-in-90 duration-500">
+                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center animate-in zoom-in-75 duration-500 delay-100">
                   <CheckCircle2 className="w-8 h-8 text-green-600" />
                 </div>
                 <div>
@@ -124,7 +124,7 @@ export default function ResetPassword() {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full h-12 rounded-xl font-semibold"
+                  className="w-full h-12 rounded-xl font-semibold transition-all duration-200 active:scale-[0.98]"
                   disabled={requestLoading || !requestEmail}
                 >
                   {requestLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -142,13 +142,13 @@ export default function ResetPassword() {
   return (
     <Layout>
       <div className="min-h-[60vh] flex items-center justify-center py-16 px-4">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h1 className="text-2xl font-bold tracking-tight mb-2">Set a new password</h1>
           <p className="text-muted-foreground mb-8">Choose a strong password for your account.</p>
 
           {resetDone ? (
-            <div className="flex flex-col items-center text-center py-8 gap-4">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+            <div className="flex flex-col items-center text-center py-8 gap-4 animate-in fade-in zoom-in-90 duration-400">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center animate-in zoom-in-50 duration-500">
                 <CheckCircle2 className="w-8 h-8 text-green-600" />
               </div>
               <div>
@@ -158,7 +158,7 @@ export default function ResetPassword() {
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : resetError ? (
-            <div className="text-center py-8 space-y-4">
+            <div className="text-center py-8 space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-400">
               <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
                 <span className="text-3xl">⚠️</span>
               </div>
@@ -184,7 +184,7 @@ export default function ResetPassword() {
                   autoFocus
                 />
                 {newPassword.length > 0 && !passwordLongEnough && (
-                  <p className="text-xs text-destructive">Must be at least 8 characters ({newPassword.length}/8)</p>
+                  <p className="text-xs text-destructive animate-in fade-in duration-200">Must be at least 8 characters ({newPassword.length}/8)</p>
                 )}
               </div>
 
@@ -196,16 +196,16 @@ export default function ResetPassword() {
                   placeholder="Repeat your password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="h-12 rounded-xl"
+                  className={`h-12 rounded-xl transition-colors duration-200 ${confirmPassword.length > 0 && !passwordsMatch ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
                 {confirmPassword.length > 0 && !passwordsMatch && (
-                  <p className="text-xs text-destructive">Passwords do not match</p>
+                  <p className="text-xs text-destructive animate-in fade-in duration-200">Passwords do not match</p>
                 )}
               </div>
 
               <Button
                 type="submit"
-                className="w-full h-12 rounded-xl font-semibold"
+                className="w-full h-12 rounded-xl font-semibold transition-all duration-200 active:scale-[0.98]"
                 disabled={resetLoading || !canSubmitReset}
               >
                 {resetLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

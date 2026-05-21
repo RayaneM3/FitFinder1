@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, API_BASE } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Trash2, Camera, Plus, X, AlertTriangle, ExternalLink, CheckCircle2, CreditCard } from "lucide-react";
+import { Loader2, Trash2, Camera, Plus, X, AlertTriangle, ExternalLink, CheckCircle2, CreditCard, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 
 const LANGUAGES = ["English", "Spanish", "French", "Mandarin", "Hindi", "Russian", "Portuguese", "Arabic", "German", "Japanese"];
@@ -75,6 +75,10 @@ export default function Settings() {
   const [languages, setLanguages] = useState<string[]>(["English"]);
   const [coachingMode, setCoachingMode] = useState("ONLINE");
   const [saving, setSaving] = useState(false);
+  const [savedProfile, setSavedProfile] = useState(false);
+  const [savedTrainer, setSavedTrainer] = useState(false);
+  const [savedClient, setSavedClient] = useState(false);
+  const [savedPassword, setSavedPassword] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -168,6 +172,8 @@ export default function Settings() {
       await apiRequest("PATCH", "/api/settings/profile", { name, bio, city, country, languages, coachingMode });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({ title: "Profile updated" });
+      setSavedProfile(true);
+      setTimeout(() => setSavedProfile(false), 2000);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -188,6 +194,8 @@ export default function Settings() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setSavedPassword(true);
+      setTimeout(() => setSavedPassword(false), 2000);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -209,6 +217,8 @@ export default function Settings() {
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/trainer-profile"] });
       toast({ title: "Trainer profile updated" });
+      setSavedTrainer(true);
+      setTimeout(() => setSavedTrainer(false), 2000);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -227,6 +237,8 @@ export default function Settings() {
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/client-profile"] });
       toast({ title: "Client profile updated" });
+      setSavedClient(true);
+      setTimeout(() => setSavedClient(false), 2000);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -291,7 +303,7 @@ export default function Settings() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 md:px-8 py-8 max-w-3xl">
+      <div className="container mx-auto px-4 md:px-8 py-8 max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500">
         <h1 className="text-3xl font-bold tracking-tight mb-8">Settings</h1>
 
         <Tabs defaultValue="profile" className="w-full">
@@ -305,14 +317,21 @@ export default function Settings() {
           </TabsList>
 
           {/* Profile Tab */}
-          <TabsContent value="profile" className="space-y-6">
+          <TabsContent value="profile" className="space-y-6 animate-in fade-in duration-300">
             {/* Avatar upload */}
             <div className="flex items-center gap-5">
-              <div className="relative">
-                <Avatar className="h-20 w-20 border-2 border-border">
+              <div className="relative group/avatar">
+                <Avatar className="h-20 w-20 border-2 border-border transition-transform duration-200 group-hover/avatar:scale-105">
                   <AvatarImage src={user?.image || undefined} alt={user?.name} />
                   <AvatarFallback className="text-2xl font-bold">{user?.name?.charAt(0) || "U"}</AvatarFallback>
                 </Avatar>
+                {/* hover overlay */}
+                <div
+                  className="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200 cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Camera className="w-5 h-5 text-white" />
+                </div>
                 <button
                   className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
                   onClick={() => fileInputRef.current?.click()}
@@ -358,7 +377,7 @@ export default function Settings() {
               <Label>Languages</Label>
               <div className="flex flex-wrap gap-2">
                 {LANGUAGES.map(lang => (
-                  <Badge key={lang} variant={languages.includes(lang) ? "default" : "outline"} className="cursor-pointer rounded-lg px-3 py-1.5 text-sm" onClick={() => toggleLang(lang)}>
+                  <Badge key={lang} variant={languages.includes(lang) ? "default" : "outline"} className="cursor-pointer rounded-lg px-3 py-1.5 text-sm transition-all duration-150 active:scale-90 select-none" onClick={() => toggleLang(lang)}>
                     {lang}
                   </Badge>
                 ))}
@@ -375,14 +394,19 @@ export default function Settings() {
                 </SelectContent>
               </Select>
             </div>
-            <Button className="rounded-xl h-12 px-8" onClick={handleSaveProfile} disabled={saving} data-testid="button-save-profile">
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
+            <Button
+              className={`rounded-xl h-12 px-8 transition-all duration-300 ${savedProfile ? "bg-green-600 hover:bg-green-600" : ""}`}
+              onClick={handleSaveProfile}
+              disabled={saving}
+              data-testid="button-save-profile"
+            >
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : savedProfile ? <Check className="mr-2 h-4 w-4" /> : null}
+              {savedProfile ? "Saved!" : "Save Changes"}
             </Button>
           </TabsContent>
 
           {/* Security Tab */}
-          <TabsContent value="security" className="space-y-6">
+          <TabsContent value="security" className="space-y-6 animate-in fade-in duration-300">
             <div className="space-y-2">
               <Label htmlFor="current-password">Current Password</Label>
               <Input id="current-password" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="h-12 rounded-xl" data-testid="input-current-password" />
@@ -396,14 +420,19 @@ export default function Settings() {
               <Input id="confirm-password" type="password" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setPwError(""); }} className={`h-12 rounded-xl ${pwError ? 'border-destructive' : ''}`} data-testid="input-confirm-password" />
               {pwError && <p className="text-xs text-destructive">{pwError}</p>}
             </div>
-            <Button className="rounded-xl h-12 px-8" onClick={handleChangePassword} disabled={changingPw || newPassword.length < 8 || !confirmPassword} data-testid="button-change-password">
-              {changingPw && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Change Password
+            <Button
+              className={`rounded-xl h-12 px-8 transition-all duration-300 ${savedPassword ? "bg-green-600 hover:bg-green-600" : ""}`}
+              onClick={handleChangePassword}
+              disabled={changingPw || newPassword.length < 8 || !confirmPassword}
+              data-testid="button-change-password"
+            >
+              {changingPw ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : savedPassword ? <Check className="mr-2 h-4 w-4" /> : null}
+              {savedPassword ? "Changed!" : "Change Password"}
             </Button>
           </TabsContent>
 
           {/* Blocked Users Tab */}
-          <TabsContent value="blocked" className="space-y-4">
+          <TabsContent value="blocked" className="space-y-4 animate-in fade-in duration-300">
             {(!blockedUsers || blockedUsers.length === 0) ? (
               <div className="text-center py-12 text-muted-foreground">
                 <p className="text-lg font-medium">No blocked users</p>
@@ -428,7 +457,7 @@ export default function Settings() {
 
           {/* Trainer Profile Tab */}
           {isTrainer && (
-            <TabsContent value="trainer" className="space-y-6">
+            <TabsContent value="trainer" className="space-y-6 animate-in fade-in duration-300">
               {/* Completeness score */}
               {(() => {
                 const checks = [
@@ -463,7 +492,7 @@ export default function Settings() {
                 <Label>Specialties</Label>
                 <div className="flex flex-wrap gap-2">
                   {ALL_SPECIALTIES.map(spec => (
-                    <Badge key={spec} variant={specialties.includes(spec) ? "default" : "outline"} className="cursor-pointer rounded-lg px-3 py-1.5 text-sm" onClick={() => toggleSpecialty(spec)}>
+                    <Badge key={spec} variant={specialties.includes(spec) ? "default" : "outline"} className="cursor-pointer rounded-lg px-3 py-1.5 text-sm transition-all duration-150 active:scale-90 select-none" onClick={() => toggleSpecialty(spec)}>
                       {spec}
                     </Badge>
                   ))}
@@ -519,16 +548,21 @@ export default function Settings() {
                 <Label htmlFor="availability-notes">Availability Notes</Label>
                 <Textarea id="availability-notes" value={availabilityNotes} onChange={e => setAvailabilityNotes(e.target.value)} placeholder="e.g. Mon–Fri, mornings preferred. Online sessions via Zoom." className="rounded-xl min-h-[80px]" data-testid="input-availability" />
               </div>
-              <Button className="rounded-xl h-12 px-8" onClick={handleSaveTrainerProfile} disabled={savingTrainer} data-testid="button-save-trainer">
-                {savingTrainer && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Trainer Profile
+              <Button
+                className={`rounded-xl h-12 px-8 transition-all duration-300 ${savedTrainer ? "bg-green-600 hover:bg-green-600" : ""}`}
+                onClick={handleSaveTrainerProfile}
+                disabled={savingTrainer}
+                data-testid="button-save-trainer"
+              >
+                {savingTrainer ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : savedTrainer ? <Check className="mr-2 h-4 w-4" /> : null}
+                {savedTrainer ? "Saved!" : "Save Trainer Profile"}
               </Button>
             </TabsContent>
           )}
 
           {/* Payments Tab */}
           {isTrainer && (
-            <TabsContent value="payments" className="space-y-6">
+            <TabsContent value="payments" className="space-y-6 animate-in fade-in duration-300">
               <div className="rounded-2xl border p-6 space-y-4">
                 <div className="flex items-center gap-3 mb-2">
                   <CreditCard className="w-5 h-5 text-muted-foreground" />
@@ -591,12 +625,12 @@ export default function Settings() {
 
           {/* Client Profile Tab */}
           {isClient && (
-            <TabsContent value="client" className="space-y-6">
+            <TabsContent value="client" className="space-y-6 animate-in fade-in duration-300">
               <div className="space-y-2">
                 <Label>Goals</Label>
                 <div className="flex flex-wrap gap-2">
                   {ALL_GOALS.map(goal => (
-                    <Badge key={goal} variant={goals.includes(goal) ? "default" : "outline"} className="cursor-pointer rounded-lg px-3 py-1.5 text-sm" onClick={() => toggleGoal(goal)}>
+                    <Badge key={goal} variant={goals.includes(goal) ? "default" : "outline"} className="cursor-pointer rounded-lg px-3 py-1.5 text-sm transition-all duration-150 active:scale-90 select-none" onClick={() => toggleGoal(goal)}>
                       {goal}
                     </Badge>
                   ))}
@@ -623,9 +657,14 @@ export default function Settings() {
                   <Input id="budget-max" type="number" min={0} value={budgetMax} onChange={e => setBudgetMax(Number(e.target.value))} className="h-12 rounded-xl" data-testid="input-budget-max" />
                 </div>
               </div>
-              <Button className="rounded-xl h-12 px-8" onClick={handleSaveClientProfile} disabled={savingClient} data-testid="button-save-client">
-                {savingClient && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Client Profile
+              <Button
+                className={`rounded-xl h-12 px-8 transition-all duration-300 ${savedClient ? "bg-green-600 hover:bg-green-600" : ""}`}
+                onClick={handleSaveClientProfile}
+                disabled={savingClient}
+                data-testid="button-save-client"
+              >
+                {savingClient ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : savedClient ? <Check className="mr-2 h-4 w-4" /> : null}
+                {savedClient ? "Saved!" : "Save Client Profile"}
               </Button>
             </TabsContent>
           )}
