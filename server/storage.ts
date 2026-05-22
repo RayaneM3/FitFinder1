@@ -116,15 +116,36 @@ export interface IStorage {
   updateOrderStripeSession(orderId: string, stripeSessionId: string): Promise<void>;
 }
 
+// Explicit column list for the users table — prevents newly-added sensitive columns
+// (e.g. mfaSecret, backupCodes) from silently appearing in query results.
+// passwordHash is included here because auth callers (bcrypt.compare) need it.
+// Route handlers must NEVER send this result directly to res.json() — always use
+// safeOwnUserResponse() or safeUserResponse() from server/utils/safe-user.ts.
+const USER_COLUMNS = {
+  id: users.id,
+  email: users.email,
+  passwordHash: users.passwordHash,
+  name: users.name,
+  image: users.image,
+  role: users.role,
+  onboardingComplete: users.onboardingComplete,
+  isAdmin: users.isAdmin,
+  bannedAt: users.bannedAt,
+  failedLoginAttempts: users.failedLoginAttempts,
+  lockedUntil: users.lockedUntil,
+  createdAt: users.createdAt,
+  updatedAt: users.updatedAt,
+};
+
 export class DatabaseStorage implements IStorage {
   // --- Users ---
   async getUser(id: string) {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db.select(USER_COLUMNS).from(users).where(eq(users.id, id));
     return user;
   }
 
   async getUserByEmail(email: string) {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db.select(USER_COLUMNS).from(users).where(eq(users.email, email));
     return user;
   }
 

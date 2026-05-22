@@ -48,6 +48,14 @@ router.get("/api/stripe/callback", async (req, res) => {
     delete req.session.stripeOAuthState;
     const userId = req.session.userId;
     if (!userId) return res.redirect(`${appUrl}/auth`);
+
+    // Re-verify the user is still a trainer (role may have changed since OAuth was initiated)
+    const user = await storage.getUser(userId);
+    if (!user || (user.role !== "TRAINER" && user.role !== "BOTH")) {
+      console.warn(`[stripe/callback] userId ${userId} is not a trainer — rejecting Stripe link`);
+      return res.redirect(`${appUrl}/dashboard?stripe=error`);
+    }
+
     const response = await (stripe as any).oauth.token({ grant_type: "authorization_code", code });
     const stripeAccountId = response.stripe_user_id;
     if (!stripeAccountId) return res.redirect(`${appUrl}/dashboard?stripe=error`);

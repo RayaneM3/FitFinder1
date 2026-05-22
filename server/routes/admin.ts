@@ -151,6 +151,9 @@ router.post("/api/admin/users/:id/warn", requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
     if (!reason?.trim()) return res.status(400).json({ message: "reason is required" });
+    if (typeof reason !== "string" || reason.length > 1000) {
+      return res.status(400).json({ message: "reason must be 1000 characters or less" });
+    }
     const user = await storage.getUser(id as string);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -168,7 +171,7 @@ router.post("/api/admin/users/:id/warn", requireAdmin, async (req, res) => {
     <p style="margin:0 0 16px;color:#4b5563;">Hi ${escapeHtml(user.name || "there")},</p>
     <p style="margin:0 0 16px;color:#4b5563;">Your account has received a warning from the Fit Finder moderation team.</p>
     <div style="background:#fef3c7;border:1px solid #fcd34d;padding:16px;border-radius:8px;margin:16px 0;">
-      <p style="color:#92400e;margin:0;font-weight:500;">${reason.trim()}</p>
+      <p style="color:#92400e;margin:0;font-weight:500;">${escapeHtml(reason.trim())}</p>
     </div>
     <p style="margin:0 0 16px;color:#4b5563;">Please review our <a href="${FRONTEND_URL}/legal/community-guidelines" style="color:#3b82f6;">Community Guidelines</a>. Repeated violations may result in account suspension.</p>
     <p style="margin:0;color:#6b7280;font-size:13px;">If you believe this is a mistake, reply to this email.</p>
