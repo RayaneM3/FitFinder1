@@ -5,11 +5,21 @@ import { z } from "zod";
 import { createReviewSchema } from "@shared/schema";
 import { pool } from "../db";
 import { deleteImage, R2_PUBLIC_URL } from "../upload";
+import rateLimit from "express-rate-limit";
+import { sanitizeObject } from "../utils/sanitize";
+
+const sensitiveOpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { message: "Rate limit exceeded for this operation. Try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = Router();
 
 // ========== ACCOUNT DELETION ==========
-router.delete("/api/account", requireAuth, async (req, res) => {
+router.delete("/api/account", sensitiveOpLimiter, requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
     // Fetch avatar URL before deletion so we can clean up R2
@@ -136,7 +146,8 @@ router.post("/api/plans", requireAuth, async (req, res) => {
       return res.status(400).json({ message: parsed.error.errors[0]?.message || "Validation error" });
     }
 
-    const { title, description, priceCents, currency, billingType } = parsed.data;
+    const clean = sanitizeObject(parsed.data);
+    const { title, description, priceCents, currency, billingType } = clean;
     const plan = await storage.createPlan({
       trainerId: req.session.userId!,
       title,
@@ -153,9 +164,9 @@ router.post("/api/plans", requireAuth, async (req, res) => {
 });
 
 const updatePlanSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().optional(),
-  priceCents: z.number().int().min(50).optional(),
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional(),
+  priceCents: z.number().int().min(100).max(100_000_000).optional(), // min £1, max £1M
   billingType: z.enum(["ONE_TIME", "MONTHLY"]).optional(),
   isActive: z.boolean().optional(),
 });
@@ -171,7 +182,7 @@ router.patch("/api/plans/:id", requireAuth, async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.errors[0]?.message || "Validation error" });
     }
-    const updated = await storage.updatePlan(planId, parsed.data);
+    const updated = await storage.updatePlan(planId, sanitizeObject(parsed.data));
     return res.json(updated);
   } catch (e) {
     console.error("[PATCH /api/plans/:id]:", e);

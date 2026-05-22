@@ -62,9 +62,9 @@ router.get("/api/stripe/callback", async (req, res) => {
 router.get("/api/stripe/status", requireAuth, async (req, res) => {
   try {
     const tp = await storage.getTrainerProfile(req.session.userId!);
+    // accountId is intentionally excluded — it's sensitive and the frontend only needs connected:bool
     return res.json({
       connected: tp?.stripeAccountConnected ?? false,
-      accountId: tp?.stripeAccountId ?? null,
     });
   } catch (e) {
     console.error("[GET /api/stripe/status]:", e);

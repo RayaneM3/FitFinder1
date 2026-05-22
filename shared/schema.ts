@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   isAdmin: boolean("is_admin").notNull().default(false),
   bannedAt: timestamp("banned_at"),
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
@@ -230,14 +232,14 @@ export type InsertReview = z.infer<typeof insertReviewSchema>;
 
 // --- Validation Schemas for API ---
 export const signupSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().max(254),
   password: z.string().min(8).max(72), // bcrypt only uses first 72 bytes; cap to prevent DoS
-  name: z.string().min(1),
+  name: z.string().min(1).max(100),
 });
 
 export const signinSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email().max(254),
+  password: z.string().min(1).max(72),
 });
 
 export const onboardingStep1Schema = z.object({
@@ -245,26 +247,26 @@ export const onboardingStep1Schema = z.object({
 });
 
 export const onboardingStep2Schema = z.object({
-  name: z.string().min(1),
-  bio: z.string().optional(),
-  city: z.string().min(1),
-  country: z.string().min(1),
-  languages: z.array(z.string()).min(1),
+  name: z.string().min(1).max(100),
+  bio: z.string().max(2000).optional(),
+  city: z.string().min(1).max(100),
+  country: z.string().min(1).max(100),
+  languages: z.array(z.string().max(50)).min(1).max(10),
   coachingMode: z.enum(["ONLINE", "IN_PERSON", "HYBRID"]),
 });
 
 export const onboardingTrainerSchema = z.object({
-  specialties: z.array(z.string()).min(1),
-  yearsExperience: z.number().min(0),
-  certifications: z.array(z.string()),
+  specialties: z.array(z.string().max(100)).min(1).max(15),
+  yearsExperience: z.number().min(0).max(60),
+  certifications: z.array(z.string().max(200)).max(20),
   priceMin: z.number().min(0),
   priceMax: z.number().min(0),
   radiusKm: z.number().min(0).optional(),
-  availabilityNotes: z.string().optional(),
+  availabilityNotes: z.string().max(2000).optional(),
 });
 
 export const onboardingClientSchema = z.object({
-  goals: z.array(z.string()).min(1),
+  goals: z.array(z.string().max(200)).min(1).max(10),
   experienceLevel: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]),
   budgetMin: z.number().min(0),
   budgetMax: z.number().min(0),
@@ -273,7 +275,7 @@ export const onboardingClientSchema = z.object({
 export const createReviewSchema = z.object({
   orderId: z.string().min(1),
   rating: z.number().int().min(1).max(5),
-  comment: z.string().max(500).optional(),
+  comment: z.string().max(2000).optional(),
 });
 
 export const exploreFiltersSchema = z.object({

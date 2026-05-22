@@ -184,8 +184,9 @@ ${allPages
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (reduced from 30)
+        sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+        domain: undefined, // Let the browser set this automatically
       },
     })
   );

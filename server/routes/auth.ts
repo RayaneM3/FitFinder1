@@ -9,6 +9,8 @@ import { db, pool } from "../db";
 import { passwordResetTokens } from "@shared/schema";
 import { eq, and, gt, isNull } from "drizzle-orm";
 import { sendEmail, passwordResetEmail } from "../email";
+import { sanitizeString } from "../utils/sanitize";
+import { safeOwnUserResponse } from "../utils/safe-user";
 
 const router = Router();
 
@@ -28,10 +30,16 @@ const meLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// ========== ACCOUNT LOCKOUT CONSTANTS ==========
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 30;
+
 router.post("/api/auth/signup", authLimiter, async (req, res) => {
   try {
     const data = signupSchema.parse(req.body);
     const normalizedEmail = data.email.toLowerCase().trim();
+    const cleanName = sanitizeString(data.name.trim());
+
     const existing = await storage.getUserByEmail(normalizedEmail);
     if (existing) {
       return res.status(409).json({ message: "An account with this email already exists" });
@@ -40,10 +48,25 @@ router.post("/api/auth/signup", authLimiter, async (req, res) => {
     const user = await storage.createUser({
       email: normalizedEmail,
       passwordHash,
-      name: data.name.trim(),
+      name: cleanName,
     });
-    req.session.userId = user.id;
-    return res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, onboardingComplete: user.onboardingComplete, isAdmin: user.isAdmin } });
+
+    // Regenerate session to prevent session fixation
+    const userId = user.id;
+    req.session.regenerate((regenErr) => {
+      if (regenErr) {
+        console.error("[auth/signup] Session regeneration failed:", regenErr);
+        return res.status(500).json({ message: "Server error" });
+      }
+      req.session.userId = userId;
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error("[auth/signup] Session save failed:", saveErr);
+          return res.status(500).json({ message: "Server error" });
+        }
+        return res.json({ user: safeOwnUserResponse(user) });
+      });
+    });
   } catch (e: any) {
     if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0]?.message || "Validation error" });
     console.error("[POST /api/auth/signup]:", e);
@@ -56,18 +79,55 @@ router.post("/api/auth/signin", authLimiter, async (req, res) => {
     const data = signinSchema.parse(req.body);
     const normalizedEmail = data.email.toLowerCase().trim();
     const user = await storage.getUserByEmail(normalizedEmail);
+
     if (!user || !user.passwordHash) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
-    const valid = await bcrypt.compare(data.password, user.passwordHash);
-    if (!valid) {
-      return res.status(401).json({ message: "Invalid email or password" });
+
+    // Account lockout check
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      return res.status(423).json({ message: "Account temporarily locked due to too many failed attempts. Please try again later." });
     }
+
     if (user.bannedAt) {
       return res.status(403).json({ message: "Account suspended. Please contact support." });
     }
-    req.session.userId = user.id;
-    return res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role, onboardingComplete: user.onboardingComplete, image: user.image, isAdmin: user.isAdmin } });
+
+    const valid = await bcrypt.compare(data.password, user.passwordHash);
+    if (!valid) {
+      // Increment failed attempts
+      const newAttempts = (user.failedLoginAttempts ?? 0) + 1;
+      const lockout = newAttempts >= MAX_FAILED_ATTEMPTS
+        ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
+        : undefined;
+      await storage.updateUser(user.id, {
+        failedLoginAttempts: newAttempts,
+        ...(lockout ? { lockedUntil: lockout } : {}),
+      });
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Successful login — reset lockout state
+    if ((user.failedLoginAttempts ?? 0) > 0 || user.lockedUntil) {
+      await storage.updateUser(user.id, { failedLoginAttempts: 0, lockedUntil: null });
+    }
+
+    // Regenerate session to prevent session fixation
+    const userId = user.id;
+    req.session.regenerate((regenErr) => {
+      if (regenErr) {
+        console.error("[auth/signin] Session regeneration failed:", regenErr);
+        return res.status(500).json({ message: "Server error" });
+      }
+      req.session.userId = userId;
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.error("[auth/signin] Session save failed:", saveErr);
+          return res.status(500).json({ message: "Server error" });
+        }
+        return res.json({ user: safeOwnUserResponse(user) });
+      });
+    });
   } catch (e: any) {
     if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors[0]?.message || "Validation error" });
     console.error("[POST /api/auth/signin]:", e);
@@ -95,15 +155,7 @@ router.get("/api/auth/me", meLimiter, async (req, res) => {
   }
   const profile = await storage.getProfile(user.id);
   return res.json({
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      image: user.image,
-      onboardingComplete: user.onboardingComplete,
-      isAdmin: user.isAdmin,
-    },
+    user: safeOwnUserResponse(user),
     profile: profile || null,
   });
 });
@@ -158,6 +210,9 @@ router.post("/api/auth/reset-password", resetPasswordLimiter, async (req, res) =
     if (!token || typeof token !== "string" || !newPassword || newPassword.length < 8) {
       return res.status(400).json({ message: "This reset link is invalid or has expired" });
     }
+    if (newPassword.length > 72) {
+      return res.status(400).json({ message: "Password must be 72 characters or less" });
+    }
 
     const [resetToken] = await db
       .select()
@@ -176,7 +231,11 @@ router.post("/api/auth/reset-password", resetPasswordLimiter, async (req, res) =
     }
 
     const hash = await bcrypt.hash(newPassword, 12);
-    await storage.updateUser(resetToken.userId, { passwordHash: hash });
+    await storage.updateUser(resetToken.userId, {
+      passwordHash: hash,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    });
 
     // Mark token as used
     await db
@@ -184,7 +243,7 @@ router.post("/api/auth/reset-password", resetPasswordLimiter, async (req, res) =
       .set({ usedAt: new Date() })
       .where(eq(passwordResetTokens.id, resetToken.id));
 
-    // Destroy all sessions for this user (JSONB operator — safe, no full table scan)
+    // Invalidate all sessions for this user (JSONB operator — safe, no full table scan)
     await pool.query(
       `DELETE FROM session WHERE sess->>'userId' = $1`,
       [resetToken.userId]

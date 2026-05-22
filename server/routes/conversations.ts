@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { requireAuth } from "../middleware";
 import { sendEmail, newMessageEmail } from "../email";
 import { isUserOnline } from "../websocket";
+import { sanitizeString } from "../utils/sanitize";
 
 // Per-conversation email cooldown: don't spam more than once per 10 min
 const lastEmailSent = new Map<string, number>(); // key: `${userId}:${conversationId}`
@@ -117,10 +118,11 @@ router.post("/api/messages", requireAuth, async (req, res) => {
     const blocked = await storage.isBlocked(userId, otherUserId);
     if (blocked) return res.status(403).json({ message: "Cannot message this user" });
 
+    const cleanContent = sanitizeString(content.trim());
     const msg = await storage.createMessage({
       conversationId,
       senderId: userId,
-      content: content.trim(),
+      content: cleanContent,
     });
 
     // Notify recipient via email if they're offline and cooldown has passed (fire-and-forget)
@@ -133,7 +135,7 @@ router.post("/api/messages", requireAuth, async (req, res) => {
         if (recipientUser?.email && senderUser) {
           const appUrl = process.env.FRONTEND_URL || process.env.APP_URL || `https://${req.headers.host}`;
           const { subject, html } = newMessageEmail(
-            recipientUser.name, senderUser.name, content.trim(),
+            recipientUser.name, senderUser.name, cleanContent,
             `${appUrl}/messages/${conversationId}`
           );
           sendEmail(recipientUser.email, subject, html);

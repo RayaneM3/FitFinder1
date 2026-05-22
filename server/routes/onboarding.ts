@@ -6,6 +6,7 @@ import {
   onboardingTrainerSchema, onboardingClientSchema,
 } from "@shared/schema";
 import { z } from "zod";
+import { sanitizeString, sanitizeObject } from "../utils/sanitize";
 
 const router = Router();
 
@@ -23,7 +24,8 @@ router.post("/api/onboarding/role", requireAuth, async (req, res) => {
 
 router.post("/api/onboarding/profile", requireAuth, async (req, res) => {
   try {
-    const data = onboardingStep2Schema.parse(req.body);
+    const raw = onboardingStep2Schema.parse(req.body);
+    const data = sanitizeObject(raw);
     await storage.updateUser(req.session.userId!, { name: data.name });
     await storage.upsertProfile({
       userId: req.session.userId!,
@@ -47,7 +49,8 @@ router.post("/api/onboarding/trainer", requireAuth, async (req, res) => {
     if (!user || (user.role !== "TRAINER" && user.role !== "BOTH")) {
       return res.status(403).json({ message: "Only trainers can save a trainer profile" });
     }
-    const data = onboardingTrainerSchema.parse(req.body);
+    const raw = onboardingTrainerSchema.parse(req.body);
+    const data = sanitizeObject(raw);
     await storage.upsertTrainerProfile({
       userId: req.session.userId!,
       specialties: data.specialties,
@@ -72,7 +75,8 @@ router.post("/api/onboarding/client", requireAuth, async (req, res) => {
     if (!user || (user.role !== "CLIENT" && user.role !== "BOTH")) {
       return res.status(403).json({ message: "Only clients can save a client profile" });
     }
-    const data = onboardingClientSchema.parse(req.body);
+    const raw = onboardingClientSchema.parse(req.body);
+    const data = sanitizeObject(raw);
     await storage.upsertClientProfile({
       userId: req.session.userId!,
       goals: data.goals,

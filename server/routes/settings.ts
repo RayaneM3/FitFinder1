@@ -4,6 +4,16 @@ import { requireAuth } from "../middleware";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { uploadImage, deleteImage, R2_PUBLIC_URL } from "../upload";
+import rateLimit from "express-rate-limit";
+import { sanitizeObject } from "../utils/sanitize";
+
+const sensitiveOpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { message: "Rate limit exceeded for this operation. Try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = Router();
 
@@ -22,7 +32,8 @@ router.patch("/api/settings/profile", requireAuth, async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.errors[0]?.message || "Validation error" });
     }
-    const { name, bio, city, country, languages, coachingMode } = parsed.data;
+    const clean = sanitizeObject(parsed.data);
+    const { name, bio, city, country, languages, coachingMode } = clean;
     if (name) await storage.updateUser(req.session.userId!, { name });
     await storage.upsertProfile({
       userId: req.session.userId!,
@@ -35,7 +46,7 @@ router.patch("/api/settings/profile", requireAuth, async (req, res) => {
   }
 });
 
-router.patch("/api/settings/password", requireAuth, async (req, res) => {
+router.patch("/api/settings/password", sensitiveOpLimiter, requireAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword || newPassword.length < 8) {
