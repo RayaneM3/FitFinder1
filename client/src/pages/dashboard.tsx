@@ -549,7 +549,7 @@ function TrainerDashboard() {
       )}
 
       <div className="border-t pt-5">
-        <div className={`rounded-2xl border p-4 mb-4 flex items-center justify-between gap-4 ${
+        <div className={`rounded-2xl border p-4 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
           stripeStatus?.connected
             ? "border-green-200 bg-green-50 dark:bg-green-950/20"
             : "border-amber-200 bg-amber-50 dark:bg-amber-950/20"
@@ -576,7 +576,7 @@ function TrainerDashboard() {
           ) : (
             <Button
               size="sm"
-              className="shrink-0 rounded-xl"
+              className="w-full sm:w-auto shrink-0 rounded-xl"
               data-testid="button-connect-stripe"
               onClick={async () => {
                 try {
@@ -895,7 +895,7 @@ function EditPlanDialog({ plan, onClose }: { plan: any; onClose: () => void }) {
         <Label htmlFor="edit-plan-description" className="text-sm">Description</Label>
         <Textarea id="edit-plan-description" value={description} onChange={e => setDescription(e.target.value)} className="rounded-xl" />
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="edit-plan-price" className="text-sm">Price ($)</Label>
           <Input id="edit-plan-price" type="number" min={0.50} step={0.01} value={price} onChange={e => setPrice(e.target.value)} className="rounded-xl h-10" />
@@ -1098,7 +1098,7 @@ function CreatePlanDialog({ buttonVariant = "default", buttonSize = "sm", isComp
             <Label htmlFor="plan-description" className="text-sm">Description</Label>
             <Textarea id="plan-description" value={description} onChange={e => setDescription(e.target.value)} placeholder="What's included..." className="rounded-xl" data-testid="input-plan-description" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="plan-price" className="text-sm">Price ($)</Label>
               <Input id="plan-price" type="number" min={1} value={price} onChange={e => setPrice(e.target.value)} placeholder="100" className="rounded-xl h-10" data-testid="input-plan-price" />

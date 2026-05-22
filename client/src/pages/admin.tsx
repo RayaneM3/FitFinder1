@@ -159,8 +159,8 @@ function ReportsTab() {
   if (!reports?.length) return <div className="text-center py-12 text-muted-foreground">No reports yet.</div>;
 
   return (
-    <div className="rounded-2xl border overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="rounded-2xl border overflow-x-auto">
+      <table className="w-full text-sm min-w-[640px]">
         <thead className="bg-muted/50">
           <tr>
             <th className="text-left p-3 font-medium text-muted-foreground">Date</th>
@@ -331,8 +331,8 @@ function UsersTab() {
           <p className="text-destructive font-medium">Failed to load users. Please refresh the page.</p>
         </div>
       ) : (
-        <div className="rounded-2xl border overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-2xl border overflow-x-auto">
+          <table className="w-full text-sm min-w-[560px]">
             <thead className="bg-muted/50">
               <tr>
                 <th className="text-left p-3 font-medium text-muted-foreground">Name</th>

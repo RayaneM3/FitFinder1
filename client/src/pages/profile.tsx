@@ -180,7 +180,7 @@ export default function Profile() {
                 <Button
                   variant="outline"
                   size="icon"
-                  className={`rounded-xl ${trainer.isFavorited ? 'text-red-500' : ''}`}
+                  className={`rounded-xl min-h-[44px] min-w-[44px] ${trainer.isFavorited ? 'text-red-500' : ''}`}
                   onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } favoriteMutation.mutate(); }}
                   data-testid="button-favorite"
                   aria-label={trainer.isFavorited ? "Remove from favorites" : "Add to favorites"}
@@ -189,7 +189,7 @@ export default function Profile() {
                 </Button>
                 <Dialog open={reportOpen} onOpenChange={setReportOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-xl text-muted-foreground hover:text-destructive" data-testid="button-report-dialog" aria-label="Report or block trainer">
+                    <Button variant="ghost" size="icon" className="rounded-xl min-h-[44px] min-w-[44px] text-muted-foreground hover:text-destructive" data-testid="button-report-dialog" aria-label="Report or block trainer">
                       <ShieldAlert className="w-4 h-4" />
                     </Button>
                   </DialogTrigger>
@@ -234,10 +234,10 @@ export default function Profile() {
               )}
             </div>
 
-            <div className="pt-4 border-t flex flex-wrap items-center gap-4">
+            <div className="pt-4 border-t flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 sm:gap-4">
               <Button
                 size="lg"
-                className="rounded-xl h-12 px-8 shadow-md"
+                className="w-full sm:w-auto rounded-xl h-12 px-8 shadow-md"
                 onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } requestChatMutation.mutate(); }}
                 disabled={requestChatMutation.isPending || (user?.id === id)}
                 data-testid="button-request-chat"

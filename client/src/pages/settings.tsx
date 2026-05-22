@@ -307,7 +307,9 @@ export default function Settings() {
         <h1 className="text-3xl font-bold tracking-tight mb-8">Settings</h1>
 
         <Tabs defaultValue="profile" className="w-full">
-          <TabsList className={`grid w-full ${gridCols} bg-muted p-1 rounded-xl mb-8`}>
+          {/* Scrollable on narrow screens so 5-6 tab labels don't get squashed */}
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 mb-8">
+            <TabsList className={`grid ${gridCols} bg-muted p-1 rounded-xl w-max sm:w-full`}>
             <TabsTrigger value="profile" className="rounded-lg">Profile</TabsTrigger>
             <TabsTrigger value="security" className="rounded-lg">Security</TabsTrigger>
             <TabsTrigger value="blocked" className="rounded-lg">Blocked</TabsTrigger>
@@ -315,6 +317,7 @@ export default function Settings() {
             {isTrainer && <TabsTrigger value="payments" className="rounded-lg">Payments</TabsTrigger>}
             {isClient && <TabsTrigger value="client" className="rounded-lg">Client</TabsTrigger>}
           </TabsList>
+          </div>
 
           {/* Profile Tab */}
           <TabsContent value="profile" className="space-y-6 animate-in fade-in duration-300">
@@ -363,7 +366,7 @@ export default function Settings() {
               <Label htmlFor="settings-bio">Bio</Label>
               <Textarea id="settings-bio" value={bio} onChange={e => setBio(e.target.value)} className="rounded-xl min-h-[100px]" data-testid="settings-bio" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="settings-city">City</Label>
                 <Input id="settings-city" value={city} onChange={e => setCity(e.target.value)} className="h-12 rounded-xl" data-testid="settings-city" />
@@ -498,7 +501,7 @@ export default function Settings() {
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="years-experience">Years of Experience</Label>
                   <Input id="years-experience" type="number" min={0} max={60} value={yearsExperience} onChange={e => setYearsExperience(Number(e.target.value))} className="h-12 rounded-xl" data-testid="input-years-exp" />
@@ -515,7 +518,7 @@ export default function Settings() {
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="price-min">Min Price (£/$ per session)</Label>
                   <Input id="price-min" type="number" min={0} value={priceMin} onChange={e => setPriceMin(Number(e.target.value))} className="h-12 rounded-xl" data-testid="input-price-min" />
@@ -647,7 +650,7 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="budget-min">Budget Min (per session)</Label>
                   <Input id="budget-min" type="number" min={0} value={budgetMin} onChange={e => setBudgetMin(Number(e.target.value))} className="h-12 rounded-xl" data-testid="input-budget-min" />

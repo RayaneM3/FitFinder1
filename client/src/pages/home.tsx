@@ -98,14 +98,14 @@ export default function Home() {
 
               {/* CTAs */}
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 flex flex-col sm:flex-row gap-4">
-                <Link href="/explore">
-                  <Button size="lg" className="h-14 px-8 text-base rounded-xl shadow-lg shadow-primary/20 group transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5" data-testid="button-find-trainer">
+                <Link href="/explore" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-base rounded-xl shadow-lg shadow-primary/20 group transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5" data-testid="button-find-trainer">
                     Find a Trainer
                     <ChevronRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                <Link href="/auth">
-                  <Button size="lg" variant="outline" className="h-14 px-8 text-base rounded-xl bg-background transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md" data-testid="button-become-trainer">
+                <Link href="/auth" className="w-full sm:w-auto">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-base rounded-xl bg-background transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md" data-testid="button-become-trainer">
                     Become a Trainer
                   </Button>
                 </Link>
@@ -208,15 +208,15 @@ export default function Home() {
               Browse hundreds of certified personal trainers across the UK, Ireland, Europe, and beyond — all in one place, all vetted for quality.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/explore">
-                <Button size="lg" className="h-14 px-10 text-base rounded-xl shadow-lg shadow-primary/20 group transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30" data-testid="button-cta-explore">
+              <Link href="/explore" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto h-14 px-10 text-base rounded-xl shadow-lg shadow-primary/20 group transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30" data-testid="button-cta-explore">
                   <Search className="mr-2 h-4 w-4" />
                   Start Exploring
                   <ChevronRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Link href="/how-it-works">
-                <Button size="lg" variant="outline" className="h-14 px-10 text-base rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md" data-testid="button-cta-how">
+              <Link href="/how-it-works" className="w-full sm:w-auto">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-10 text-base rounded-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md" data-testid="button-cta-how">
                   How It Works
                 </Button>
               </Link>

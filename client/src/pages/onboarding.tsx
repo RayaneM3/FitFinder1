@@ -281,7 +281,7 @@ export default function Onboarding() {
                     <Label htmlFor="bio">Bio</Label>
                     <Textarea id="bio" value={profileData.bio} onChange={e => setProfileData(p => ({ ...p, bio: e.target.value }))} placeholder="Tell people about yourself..." className="rounded-xl min-h-[100px]" data-testid="input-bio" />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="city">City <span className="text-destructive">*</span></Label>
                       <Input id="city" value={profileData.city} onChange={e => setProfileData(p => ({ ...p, city: e.target.value }))} placeholder="San Francisco" className="h-12 rounded-xl" data-testid="input-city" />
@@ -341,7 +341,7 @@ export default function Onboarding() {
                       ))}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="experience">Years of Experience</Label>
                       <Input id="experience" type="number" min={0} value={trainerData.yearsExperience} onChange={e => setTrainerData(p => ({ ...p, yearsExperience: parseInt(e.target.value) || 0 }))} className="h-12 rounded-xl" data-testid="input-experience" />
@@ -369,7 +369,7 @@ export default function Onboarding() {
                       ))}
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="price-min">Min Price ($/session)</Label>
                       <Input id="price-min" type="number" min={0} value={trainerData.priceMin} onChange={e => setTrainerData(p => ({ ...p, priceMin: parseInt(e.target.value) || 0 }))} className="h-12 rounded-xl" data-testid="input-price-min" />
@@ -475,7 +475,7 @@ function ClientGoalsStep({ clientData, setClientData, toggleItem, acceptedClient
             </SelectContent>
           </Select>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="budget-min">Min Budget ($/session)</Label>
             <Input id="budget-min" type="number" min={0} value={clientData.budgetMin} onChange={e => setClientData((p: any) => ({ ...p, budgetMin: parseInt(e.target.value) || 0 }))} className="h-12 rounded-xl" data-testid="input-budget-min" />
