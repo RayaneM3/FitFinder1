@@ -10,3 +10,8 @@ vite.config.ts.*
 attached_assets/
 docs/build-prompts/
 *.sql
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
