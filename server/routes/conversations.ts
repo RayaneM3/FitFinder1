@@ -4,6 +4,21 @@ import { requireAuth } from "../middleware";
 import { sendEmail, newMessageEmail } from "../email";
 import { isUserOnline } from "../websocket";
 import { sanitizeString } from "../utils/sanitize";
+import { z } from "zod";
+
+const createConversationSchema = z.object({
+  trainerId: z.string().min(1),
+});
+
+const createBlockSchema = z.object({
+  blockedId: z.string().min(1),
+});
+
+const createReportSchema = z.object({
+  reportedId: z.string().min(1),
+  category: z.enum(["HARASSMENT", "SPAM", "INAPPROPRIATE", "SCAM", "OTHER"]),
+  details: z.string().max(2000).optional(),
+});
 
 // Per-conversation email cooldown: don't spam more than once per 10 min
 const lastEmailSent = new Map<string, number>(); // key: `${userId}:${conversationId}`
@@ -13,7 +28,11 @@ const router = Router();
 
 router.post("/api/conversations", requireAuth, async (req, res) => {
   try {
-    const { trainerId } = req.body;
+    const parsed = createConversationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0]?.message || "trainerId is required" });
+    }
+    const { trainerId } = parsed.data;
     const userId = req.session.userId!;
 
     if (trainerId === userId) {
@@ -152,8 +171,11 @@ router.post("/api/messages", requireAuth, async (req, res) => {
 
 router.post("/api/block", requireAuth, async (req, res) => {
   try {
-    const { blockedId } = req.body;
-    if (!blockedId) return res.status(400).json({ message: "blockedId required" });
+    const parsed = createBlockSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "blockedId is required" });
+    }
+    const { blockedId } = parsed.data;
     await storage.createBlock({ blockerId: req.session.userId!, blockedId });
     return res.json({ success: true });
   } catch (e) {
@@ -184,16 +206,17 @@ router.get("/api/blocked", requireAuth, async (req, res) => {
 
 router.post("/api/report", requireAuth, async (req, res) => {
   try {
-    const { reportedId, category, details } = req.body;
-    const VALID_CATEGORIES = ["HARASSMENT", "SPAM", "INAPPROPRIATE", "SCAM", "OTHER"];
-    if (!reportedId || !category) return res.status(400).json({ message: "reportedId and category required" });
-    if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ message: "Invalid category" });
+    const parsed = createReportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid report data" });
+    }
+    const { reportedId, category, details } = parsed.data;
     if (reportedId === req.session.userId) return res.status(400).json({ message: "Cannot report yourself" });
     await storage.createReport({
       reporterId: req.session.userId!,
       reportedId,
       category: category as any,
-      details: typeof details === "string" ? details.slice(0, 1000) : "",
+      details: details ?? "",
     });
     return res.json({ success: true });
   } catch (e) {

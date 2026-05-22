@@ -3,6 +3,11 @@ import { storage } from "../storage";
 import { requireAuth } from "../middleware";
 import { stripe, calculatePlatformFee } from "../stripe";
 import crypto from "crypto";
+import { z } from "zod";
+
+const checkoutSchema = z.object({
+  planId: z.string().min(1),
+});
 
 const router = Router();
 
@@ -82,8 +87,11 @@ router.get("/api/stripe/status", requireAuth, async (req, res) => {
 
 router.post("/api/checkout", requireAuth, async (req, res) => {
   try {
-    const { planId } = req.body;
-    if (!planId) return res.status(400).json({ message: "planId is required" });
+    const bodyParsed = checkoutSchema.safeParse(req.body);
+    if (!bodyParsed.success) {
+      return res.status(400).json({ message: "planId is required" });
+    }
+    const { planId } = bodyParsed.data;
 
     const plan = await storage.getPlan(planId);
     if (!plan || !plan.isActive) {
