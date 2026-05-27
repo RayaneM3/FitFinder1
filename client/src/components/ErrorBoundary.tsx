@@ -1,4 +1,5 @@
 import { Component, type ReactNode, type ErrorInfo } from "react";
+import * as Sentry from "@sentry/react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -22,6 +23,8 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[ErrorBoundary] Uncaught error:", error, info);
+    // Report to Sentry (no-op if VITE_SENTRY_DSN is not set / SDK not initialised)
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
   }
 
   render() {

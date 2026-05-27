@@ -1,3 +1,16 @@
+# ── Nixpacks build config for Railway (production + staging) ──────────────────
+#
+# Staging environment:
+#   The build process is identical for production and staging.
+#   Staging mode is detected at RUNTIME via the RAILWAY_ENVIRONMENT env var.
+#   To deploy a staging service on Railway:
+#     1. Create a second Railway service (e.g. "fitfinder-staging")
+#     2. Set RAILWAY_ENVIRONMENT=staging in that service's Variables tab
+#     3. Use railway.staging.json as a reference for service settings
+#   The Express app will automatically enter staging mode when it sees
+#   RAILWAY_ENVIRONMENT=staging (rate limiting off, verbose logs, full errors).
+# ──────────────────────────────────────────────────────────────────────────────
+
 [phases.setup]
 nixPkgs = ["nodejs_24", "npm-9_x", "openssl"]
 
