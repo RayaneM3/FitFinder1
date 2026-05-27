@@ -41,8 +41,11 @@ if (process.env.SENTRY_DSN) {
 const app = express();
 const httpServer = createServer(app);
 
-// ── Trust proxy (Railway terminates SSL at load balancer) ─────────────────────
-if (!isDev) {
+// ── Trust proxy ───────────────────────────────────────────────────────────────
+// Set TRUST_PROXY=true in Railway (production + staging) so that req.ip reflects
+// the real client IP forwarded by Cloudflare / Railway's load balancer.
+// Leave unset (or set to false) in local dev where there is no proxy.
+if (process.env.TRUST_PROXY === "true") {
   app.set("trust proxy", 1);
 }
 
@@ -132,6 +135,14 @@ app.use(express.urlencoded({ extended: false, limit: "100kb" }));
 // ── CSRF origin check ─────────────────────────────────────────────────────────
 app.use(csrfCheck);
 
+// ── Vary: Accept-Encoding ─────────────────────────────────────────────────────
+// Tells Cloudflare (and any intermediate cache) that the response body differs
+// by encoding, preventing compressed and uncompressed responses from colliding.
+app.use((_req, res, next) => {
+  res.setHeader("Vary", "Accept-Encoding");
+  next();
+});
+
 // ── Global API rate limiter (disabled in staging for unthrottled testing) ─────
 if (!isStaging) {
   const apiLimiter = rateLimit({
@@ -142,6 +153,13 @@ if (!isStaging) {
     legacyHeaders: false,
     skip: (req) =>
       req.path === "/api/health" || req.path === "/api/stripe/webhook",
+    // When behind Cloudflare, use CF-Connecting-IP as the rate-limit key so
+    // Cloudflare's own IPs don't get throttled instead of the real client.
+    keyGenerator: (req) => {
+      const cfIp = req.headers["cf-connecting-ip"];
+      if (typeof cfIp === "string" && cfIp) return cfIp;
+      return req.ip ?? "unknown";
+    },
   });
   app.use("/api", apiLimiter);
 }

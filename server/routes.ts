@@ -8,6 +8,8 @@ import { stripe } from "./stripe";
 import type Stripe from "stripe";
 import { registerRouteModules } from "./routes/index";
 import { sendEmail, orderPaidBuyerEmail, orderPaidTrainerEmail } from "./email";
+import { isR2Active, R2_PUBLIC_URL } from "./upload";
+import { isRedisActive, redisClient, IoRedisSessionStore } from "./lib/cache";
 
 const PgSession = connectPgSimple(session);
 
@@ -27,10 +29,32 @@ export async function registerRoutes(
   app.get("/api/health", async (_req, res) => {
     try {
       await pool.query("SELECT 1");
-      return res.json({ status: "ok", db: "connected", timestamp: new Date().toISOString() });
+      return res.json({
+        status: "ok",
+        db: "connected",
+        timestamp: new Date().toISOString(),
+        environment: process.env.RAILWAY_ENVIRONMENT ?? process.env.NODE_ENV ?? "unknown",
+      });
     } catch {
       return res.status(503).json({ status: "error", db: "disconnected" });
     }
+  });
+
+  // ========== STORAGE HEALTH (before session middleware) ==========
+  app.get("/api/health/storage", (_req, res) => {
+    const storageMode = isR2Active ? "r2" : "base64";
+    const cacheMode = isRedisActive ? "redis" : "memory-fallback";
+    res.json({
+      storage: storageMode,
+      r2Active: isR2Active,
+      r2Bucket: isR2Active ? (process.env.R2_BUCKET ?? "fitfinder-uploads") : null,
+      r2PublicUrl: isR2Active ? R2_PUBLIC_URL : null,
+      cache: cacheMode,
+      redisActive: isRedisActive,
+      warning: isR2Active
+        ? null
+        : "R2 is not configured — images are stored as base64 in PostgreSQL. This is only suitable for development.",
+    });
   });
 
   // ========== DYNAMIC SITEMAP (before session middleware) ==========
@@ -52,7 +76,7 @@ export async function registerRoutes(
          JOIN trainer_profiles tp ON tp."userId" = u.id
          WHERE u."onboardingComplete" = true`
       );
-      trainerUrls = result.rows.map((row: any) => ({
+      trainerUrls = result.rows.map((row: { id: string }) => ({
         loc: `/profile/${row.id}`,
         priority: "0.7",
       }));
@@ -171,20 +195,26 @@ ${allPages
       : "fit-finder-dev-secret-change-in-production"
   );
 
+  // Use Redis session store when REDIS_URL is configured; fall back to PostgreSQL.
+  const sessionStore =
+    isRedisActive && redisClient
+      ? new IoRedisSessionStore(redisClient)
+      : new PgSession({
+          pool: pool as any,
+          tableName: "session",
+          createTableIfMissing: true,
+        });
+
   app.use(
     session({
-      store: new PgSession({
-        pool: pool as any,
-        tableName: "session",
-        createTableIfMissing: true,
-      }),
+      store: sessionStore,
       secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (reduced from 30)
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         sameSite: process.env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
         domain: undefined, // Let the browser set this automatically
       },

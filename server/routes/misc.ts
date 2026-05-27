@@ -7,6 +7,7 @@ import { pool } from "../db";
 import { deleteImage, R2_PUBLIC_URL } from "../upload";
 import rateLimit from "express-rate-limit";
 import { sanitizeObject } from "../utils/sanitize";
+import * as cache from "../lib/cache";
 
 const sensitiveOpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -156,6 +157,12 @@ router.post("/api/plans", requireAuth, async (req, res) => {
       currency,
       billingType,
     });
+    // Invalidate trainer profile (plans are embedded) and all listing pages
+    const uid = req.session.userId!;
+    await Promise.allSettled([
+      cache.del(`trainers:profile:${uid}`),
+      cache.delPattern("trainers:list:*"),
+    ]);
     return res.json(plan);
   } catch (e) {
     console.error("[POST /api/plans]:", e);
@@ -183,6 +190,12 @@ router.patch("/api/plans/:id", requireAuth, async (req, res) => {
       return res.status(400).json({ message: parsed.error.errors[0]?.message || "Validation error" });
     }
     const updated = await storage.updatePlan(planId, sanitizeObject(parsed.data));
+    // Invalidate trainer profile (plans are embedded) and all listing pages.
+    // Use the wildcard pattern as specified — catches both listing and profile caches.
+    await Promise.allSettled([
+      cache.del(`trainers:profile:${req.session.userId!}`),
+      cache.delPattern("trainers:*"),
+    ]);
     return res.json(updated);
   } catch (e) {
     console.error("[PATCH /api/plans/:id]:", e);

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { uploadImage, deleteImage, R2_PUBLIC_URL } from "../upload";
 import rateLimit from "express-rate-limit";
 import { sanitizeObject } from "../utils/sanitize";
+import * as cache from "../lib/cache";
 
 const sensitiveOpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -39,6 +40,12 @@ router.patch("/api/settings/profile", requireAuth, async (req, res) => {
       userId: req.session.userId!,
       bio, city, country, languages, coachingMode,
     });
+    // Invalidate cached trainer profile and all listing pages
+    const uid = req.session.userId!;
+    await Promise.allSettled([
+      cache.del(`trainers:profile:${uid}`),
+      cache.delPattern("trainers:list:*"),
+    ]);
     return res.json({ success: true });
   } catch (e) {
     console.error("[PATCH /api/settings/profile]:", e);
@@ -129,6 +136,12 @@ router.patch("/api/settings/trainer-profile", requireAuth, async (req, res) => {
       availabilityNotes: parsed.data.availabilityNotes ?? existing?.availabilityNotes ?? "",
       radiusKm: existing?.radiusKm ?? 0,
     });
+    // Invalidate cached trainer profile and all listing pages
+    const uid = req.session.userId!;
+    await Promise.allSettled([
+      cache.del(`trainers:profile:${uid}`),
+      cache.delPattern("trainers:list:*"),
+    ]);
     return res.json(tp);
   } catch (e) {
     console.error("[PATCH /api/settings/trainer-profile]:", e);
