@@ -16,9 +16,13 @@ function escapeHtml(str: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function emailWrapper(content: string): string {
+function emailWrapper(content: string, preheader?: string): string {
+  const preheaderHtml = preheader
+    ? `<div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">${escapeHtml(preheader)}</div>`
+    : "";
   return `
-<div style="max-width: 560px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; line-height: 1.6;">
+<div style="max-width: 560px; width: 100%; margin: 0 auto; padding: 16px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; line-height: 1.6;">
+  ${preheaderHtml}
   <div style="padding: 24px 0; border-bottom: 1px solid #e5e5e5;">
     <div style="display: inline-flex; align-items: center; gap: 8px;">
       <div style="width: 28px; height: 28px; border-radius: 6px; background: #3b82f6; color: white; font-weight: bold; font-size: 16px; text-align: center; line-height: 28px;">F</div>
@@ -31,6 +35,7 @@ function emailWrapper(content: string): string {
   <div style="padding: 20px 0; border-top: 1px solid #e5e5e5; font-size: 12px; color: #6b7280;">
     <p style="margin: 0;">You're receiving this because you have an account on Fit Finder.</p>
     <p style="margin: 4px 0 0;">Questions? Reply to this email or contact support@fitfinder.co</p>
+    <p style="font-size: 12px; color: #9ca3af; margin-top: 24px;">This is a transactional email from Fit Finder. To stop receiving these, you can adjust your notification preferences in Settings.</p>
   </div>
 </div>`;
 }
@@ -38,7 +43,7 @@ function emailWrapper(content: string): string {
 function ctaButton(url: string, text: string): string {
   return `
   <div style="padding: 8px 0 24px;">
-    <a href="${escapeHtml(url)}" style="display: inline-block; background: #3b82f6; color: white; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+    <a href="${escapeHtml(url)}" style="display: block; width: 100%; box-sizing: border-box; text-align: center; background: #3b82f6; color: white; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 16px;">
       ${escapeHtml(text)}
     </a>
   </div>`;
@@ -70,8 +75,8 @@ export function newMessageEmail(trainerName: string, clientName: string, message
       "${safePreview}"
     </div>
     ${ctaButton(conversationUrl, `Reply to ${safeClient}`)}
-    <p style="margin: 0; font-size: 13px; color: #6b7280;">Replying quickly increases your chances of converting leads.</p>
-  `);
+    <p style="margin: 0; font-size: 14px; color: #6b7280;">Replying quickly increases your chances of converting leads.</p>
+  `, `You have a new message from ${clientName} on Fit Finder`);
   return { subject, html };
 }
 
@@ -84,11 +89,11 @@ export function orderPaidBuyerEmail(buyerName: string, trainerName: string, plan
       <p style="color: #166534; margin: 0; font-weight: 600;">&#10003; ${escapeHtml(amountFormatted)} paid successfully</p>
     </div>
     <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-      <tr><td style="color: #6b7280; padding: 8px 0;">Plan</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right; font-weight: 500;">${escapeHtml(planTitle)}</td></tr>
-      <tr><td style="color: #6b7280; padding: 8px 0;">Trainer</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right;">${escapeHtml(trainerName)}</td></tr>
+      <tr><td style="color: #6b7280; padding: 8px 0; font-size: 14px;">Plan</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right; font-weight: 500; font-size: 14px;">${escapeHtml(planTitle)}</td></tr>
+      <tr><td style="color: #6b7280; padding: 8px 0; font-size: 14px;">Trainer</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right; font-size: 14px;">${escapeHtml(trainerName)}</td></tr>
     </table>
     ${ctaButton(`${APP_URL}/dashboard`, "Go to Dashboard")}
-  `);
+  `, `Your order with ${trainerName} is confirmed`);
   return { subject, html };
 }
 
@@ -101,13 +106,13 @@ export function orderPaidTrainerEmail(trainerName: string, buyerName: string, pl
       <p style="color: #166534; margin: 0; font-weight: 600;">&#10003; ${escapeHtml(amountFormatted)} received</p>
     </div>
     <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-      <tr><td style="color: #6b7280; padding: 8px 0;">Plan</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right; font-weight: 500;">${escapeHtml(planTitle)}</td></tr>
-      <tr><td style="color: #6b7280; padding: 8px 0;">Client</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right;">${escapeHtml(buyerName)}</td></tr>
-      <tr><td style="color: #6b7280; padding: 8px 0;">You receive</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right; font-weight: 600;">${escapeHtml(trainerAmountFormatted)}</td></tr>
+      <tr><td style="color: #6b7280; padding: 8px 0; font-size: 14px;">Plan</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right; font-weight: 500; font-size: 14px;">${escapeHtml(planTitle)}</td></tr>
+      <tr><td style="color: #6b7280; padding: 8px 0; font-size: 14px;">Client</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right; font-size: 14px;">${escapeHtml(buyerName)}</td></tr>
+      <tr><td style="color: #6b7280; padding: 8px 0; font-size: 14px;">You receive</td><td style="color: #1a1a1a; padding: 8px 0; text-align: right; font-weight: 600; font-size: 14px;">${escapeHtml(trainerAmountFormatted)}</td></tr>
     </table>
-    <p style="margin: 0 0 16px; font-size: 13px; color: #6b7280;">Amount shown is after the 12.8% platform fee. Funds are deposited on Stripe's standard payout schedule.</p>
+    <p style="margin: 0 0 16px; font-size: 14px; color: #6b7280;">Amount shown is after the 12.8% platform fee. Funds are deposited on Stripe's standard payout schedule.</p>
     ${ctaButton(`${APP_URL}/dashboard`, "View Orders")}
-  `);
+  `, `New order from ${buyerName} — check your dashboard`);
   return { subject, html };
 }
 
@@ -117,7 +122,7 @@ export function passwordResetEmail(resetUrl: string) {
     <h2 style="margin: 0 0 12px; font-size: 20px; font-weight: 600;">Reset your password</h2>
     <p style="margin: 0 0 16px; color: #4b5563;">We received a request to reset your password. Click the button below to set a new one. This link expires in 1 hour.</p>
     ${ctaButton(resetUrl, "Reset Password")}
-    <p style="margin: 0; font-size: 13px; color: #6b7280;">If you didn't request this, you can safely ignore this email. Your password won't change.</p>
-  `);
+    <p style="margin: 0; font-size: 14px; color: #6b7280;">If you didn't request this, you can safely ignore this email. Your password won't change.</p>
+  `, "Reset your Fit Finder password (link expires in 1 hour)");
   return { subject, html };
 }

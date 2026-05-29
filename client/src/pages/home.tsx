@@ -60,8 +60,8 @@ export default function Home() {
 
   const trainerCount = stats?.trainerCount ?? 0;
   const socialProof = trainerCount > 0
-    ? `Join ${trainerCount}+ trainers already on the platform`
-    : "Trusted by coaches and clients worldwide";
+    ? `Trusted by ${trainerCount}+ trainers and clients across the UK`
+    : "Trusted by trainers and clients across the UK and beyond";
 
   return (
     <Layout>
@@ -88,12 +88,12 @@ export default function Home() {
 
               {/* Headline */}
               <h1 className="animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6 leading-[1.1]">
-                Find a personal trainer without the awkward outreach.
+                Find your trainer without the pressure.
               </h1>
 
               {/* Subtext */}
               <p className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 text-lg md:text-xl text-muted-foreground mb-8 max-w-lg leading-relaxed">
-                Browse elite coaches, review their specialties, and request to chat when you're ready. Whether online or local, we prioritize your comfort and goals.
+                Fit Finder is a privacy-first platform where you browse personal trainers and reach out when you're ready. No sign-up required to explore. Only you can start the conversation.
               </p>
 
               {/* CTAs */}
@@ -106,7 +106,7 @@ export default function Home() {
                 </Link>
                 <Link href="/auth" className="w-full sm:w-auto">
                   <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-base rounded-xl bg-background transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md" data-testid="button-become-trainer">
-                    Become a Trainer
+                    List Your Services
                   </Button>
                 </Link>
               </div>
@@ -160,28 +160,28 @@ export default function Home() {
       <section className="py-24 bg-muted/30 border-y">
         <div className="container mx-auto px-4 md:px-8">
           <RevealSection className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Built differently, for you.</h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">We're not a gym directory. Fit Finder is a safety-first platform that puts clients in control of every interaction.</p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Built around your comfort.</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Fit Finder isn't a gym directory. It's a client-first platform built on one principle: you decide who you talk to, and when.</p>
           </RevealSection>
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
                 icon: <MessageCircle className="w-6 h-6" />,
-                title: "You start the conversation",
-                desc: "No unsolicited messages from trainers. Browse privately and reach out when — and only when — you're ready.",
+                title: "Client-Initiated Messaging",
+                desc: "Only you can message first. Trainers cannot contact you unsolicited — ever.",
                 delay: 0,
               },
               {
                 icon: <ShieldCheck className="w-6 h-6" />,
-                title: "Location stays private",
-                desc: "Trainers only see your city, never your street or postcode. Exact location details are shared only when you decide.",
+                title: "Privacy-First Browsing",
+                desc: "Browse any profile without an account. Your postcode is never shared with trainers.",
                 delay: 120,
               },
               {
                 icon: <CreditCard className="w-6 h-6" />,
-                title: "Secure payments",
-                desc: "All transactions are processed through Stripe. Your payment details are never shared with trainers.",
+                title: "Secure Stripe Payments",
+                desc: "All payments go through Stripe. Your card details are never shared with trainers.",
                 delay: 240,
               },
             ].map((f) => (
@@ -203,9 +203,9 @@ export default function Home() {
       <section className="py-24">
         <div className="container mx-auto px-4 md:px-8 text-center max-w-3xl">
           <RevealSection>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-6">Ready to find your trainer?</h2>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-6">Find your perfect trainer today.</h2>
             <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
-              Browse hundreds of certified personal trainers across the UK, Ireland, Europe, and beyond — all in one place, all vetted for quality.
+              Browse with zero commitment — no sign-up, no pressure. Trainers: list your services for free and only pay when you earn.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/explore" className="w-full sm:w-auto">
