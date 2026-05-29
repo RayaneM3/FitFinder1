@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fitfinder-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5099,
+      "autoPort": false,
+      "env": {
+        "PORT": "5099",
+        "DATABASE_URL": "postgresql://user:pass@localhost:5432/fitfinder",
+        "SESSION_SECRET": "dev-only-secret-not-for-production-use-here"
+      }
+    }
+  ]
+}

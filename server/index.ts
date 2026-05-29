@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import * as Sentry from "@sentry/node";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -91,11 +91,15 @@ app.use(
 );
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
+const devPort = process.env.PORT ?? "5000";
 const allowedOrigins = [
   FRONTEND_URL,
   APP_URL,
   "http://localhost:5173",
   "http://localhost:5000",
+  // In dev, the server and Vite share one port — include it so browser-based
+  // tools (e.g. Preview) can make same-origin requests without CORS rejection.
+  isDev ? `http://localhost:${devPort}` : null,
 ].filter(Boolean) as string[];
 
 app.use(
@@ -157,8 +161,8 @@ if (!isStaging) {
     // Cloudflare's own IPs don't get throttled instead of the real client.
     keyGenerator: (req) => {
       const cfIp = req.headers["cf-connecting-ip"];
-      if (typeof cfIp === "string" && cfIp) return cfIp;
-      return req.ip ?? "unknown";
+      if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
+      return ipKeyGenerator(req.ip ?? "unknown");
     },
   });
   app.use("/api", apiLimiter);
@@ -265,8 +269,9 @@ app.use((req, res, next) => {
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);
+  // reusePort is only supported on Linux (Railway). macOS silently rejects it.
   httpServer.listen(
-    { port, host: "0.0.0.0", reusePort: true },
+    { port, host: "0.0.0.0", reusePort: process.platform === "linux" },
     () => {
       log(`serving on port ${port}`);
       if (isStaging) log("⚠️  Staging mode: rate limiting disabled, verbose logging enabled, full errors in responses", "staging");

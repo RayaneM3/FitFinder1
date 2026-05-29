@@ -4,7 +4,7 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { signupSchema, signinSchema } from "@shared/schema";
 import { z } from "zod";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { db, pool } from "../db";
 import { passwordResetTokens } from "@shared/schema";
 import { eq, and, gt, isNull } from "drizzle-orm";
@@ -163,7 +163,12 @@ router.get("/api/auth/me", meLimiter, async (req, res) => {
 const forgotPasswordLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 3,
-  keyGenerator: (req) => String(req.body?.email || req.ip),
+  // Key by email when present (rate-limits per account, not per IP) with IP fallback.
+  keyGenerator: (req) => {
+    const email = req.body?.email;
+    if (typeof email === "string" && email) return email.toLowerCase().trim();
+    return ipKeyGenerator(req.ip ?? "unknown");
+  },
   message: { message: "Too many reset requests. Please wait 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
