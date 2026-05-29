@@ -44,9 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/signin", { email, password });
-      return res.json();
+      return res.json() as Promise<{ user: AuthUser; profile: any } | null>;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Hydrate the cache directly from the sign-in response so the redirect
+      // fires immediately without depending on a second cross-origin /me fetch.
+      if (data?.user) {
+        queryClient.setQueryData(["/api/auth/me"], data);
+      }
+      // Also invalidate so the query stays fresh (background refetch).
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
   });
@@ -54,9 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signupMutation = useMutation({
     mutationFn: async ({ email, password, name }: { email: string; password: string; name: string }) => {
       const res = await apiRequest("POST", "/api/auth/signup", { email, password, name });
-      return res.json();
+      return res.json() as Promise<{ user: AuthUser; profile: any } | null>;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Same pattern: hydrate immediately, then schedule a background refresh.
+      if (data?.user) {
+        queryClient.setQueryData(["/api/auth/me"], data);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
   });
