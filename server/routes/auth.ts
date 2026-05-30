@@ -28,6 +28,11 @@ const meLimiter = rateLimit({
   message: { message: "Too many requests" },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    const cfIp = req.headers["cf-connecting-ip"];
+    if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
+    return ipKeyGenerator(req.ip ?? "unknown");
+  },
 });
 
 // ========== ACCOUNT LOCKOUT CONSTANTS ==========

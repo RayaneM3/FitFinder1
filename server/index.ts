@@ -42,10 +42,13 @@ const app = express();
 const httpServer = createServer(app);
 
 // ── Trust proxy ───────────────────────────────────────────────────────────────
-// Set TRUST_PROXY=true in Railway (production + staging) so that req.ip reflects
-// the real client IP forwarded by Cloudflare / Railway's load balancer.
-// Leave unset (or set to false) in local dev where there is no proxy.
-if (process.env.TRUST_PROXY === "true") {
+// Railway (and staging) terminate SSL at their load balancer and forward plain
+// HTTP to the Node.js process. Without trust proxy = 1:
+//   • req.secure is false → express-session's issecure() returns false
+//   • cookie.secure:true + issecure:false → Set-Cookie is NEVER sent
+//   • browser never stores the session cookie → every request returns 401
+// Always enable in production/staging; leave off in local dev (no proxy).
+if (process.env.TRUST_PROXY === "true" || (!isDev && !isStaging)) {
   app.set("trust proxy", 1);
 }
 
