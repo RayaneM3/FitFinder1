@@ -1,7 +1,24 @@
-import { db } from "./db";
+import { db, pool } from "./db";
 import { users, profiles, trainerProfiles } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { eq } from "drizzle-orm";
+
+/**
+ * Idempotent schema migrations — runs before seed on every startup.
+ * Each statement uses IF NOT EXISTS / IF EXISTS so it's always safe to re-run.
+ */
+export async function runMigrationsIfNeeded() {
+  try {
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at TIMESTAMP;
+    `);
+    console.log("[migrate] Schema columns verified/added.");
+  } catch (e) {
+    console.error("[migrate] Migration failed:", e);
+  }
+}
 
 const SEED_PASSWORD = process.env.SEED_PASSWORD || "FitFinder2024!";
 

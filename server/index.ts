@@ -6,7 +6,7 @@ import * as Sentry from "@sentry/node";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { runSeedIfNeeded } from "./seed";
+import { runSeedIfNeeded, runMigrationsIfNeeded } from "./seed";
 import { setupWebSocket } from "./websocket";
 import { botGuard } from "./middleware/bot-guard";
 import { csrfCheck } from "./middleware/csrf-check";
@@ -224,6 +224,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await runMigrationsIfNeeded();
   await runSeedIfNeeded();
   await registerRoutes(httpServer, app);
   setupWebSocket(httpServer);
