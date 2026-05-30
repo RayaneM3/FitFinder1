@@ -50,6 +50,23 @@ async function getSessionUserId(cookieHeader: string | undefined): Promise<strin
   }
 }
 
+// Origins permitted to open a WebSocket connection. Browsers always send an
+// Origin header on the WS handshake, so rejecting unknown origins prevents
+// cross-site WebSocket hijacking (a malicious page opening an authenticated
+// socket with the victim's cookie and reading their message broadcasts).
+const allowedWsOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.APP_URL,
+  "http://localhost:5173",
+  "http://localhost:5000",
+].filter(Boolean) as string[];
+
+function isAllowedWsOrigin(origin: string | undefined): boolean {
+  // No Origin header → non-browser client (native app, server-to-server). Allow.
+  if (!origin) return true;
+  return allowedWsOrigins.includes(origin);
+}
+
 export function setupWebSocket(httpServer: Server) {
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
@@ -68,6 +85,13 @@ export function setupWebSocket(httpServer: Server) {
   wss.on("close", () => clearInterval(pingInterval));
 
   wss.on("connection", async (ws: any, req) => {
+    // Reject cross-site connections before touching the session.
+    if (!isAllowedWsOrigin(req.headers.origin)) {
+      console.warn(`[ws] Blocked connection from origin: ${req.headers.origin}`);
+      ws.close(4003, "Forbidden origin");
+      return;
+    }
+
     const userId = await getSessionUserId(req.headers.cookie);
     if (!userId) {
       ws.close(4001, "Unauthorized");
