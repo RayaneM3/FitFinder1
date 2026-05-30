@@ -20,6 +20,11 @@ const authLimiter = rateLimit({
   message: { message: "Too many attempts. Please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    const cfIp = req.headers["cf-connecting-ip"];
+    if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
+    return ipKeyGenerator(req.ip ?? "unknown");
+  },
 });
 
 const meLimiter = rateLimit({
@@ -147,7 +152,6 @@ router.post("/api/auth/logout", (req, res) => {
 });
 
 router.get("/api/auth/me", meLimiter, async (req, res) => {
-  console.log(`[auth/me] cookie=${req.headers.cookie ? "PRESENT" : "ABSENT"} userId=${req.session.userId ?? "none"}`);
   if (!req.session.userId) {
     return res.status(401).json({ message: "Not authenticated" });
   }
@@ -213,6 +217,11 @@ const resetPasswordLimiter = rateLimit({
   message: { message: "Too many attempts. Please wait 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    const cfIp = req.headers["cf-connecting-ip"];
+    if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
+    return ipKeyGenerator(req.ip ?? "unknown");
+  },
 });
 
 router.post("/api/auth/reset-password", resetPasswordLimiter, async (req, res) => {

@@ -152,7 +152,12 @@ export default function Onboarding() {
           try { await apiRequest("POST", "/api/legal/accept", { documentType: "CLIENT_WAIVER", version: LEGAL_VERSION }); } catch {}
         }
         await apiRequest("POST", "/api/onboarding/complete", {});
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        // Update the cache directly so onboardingComplete flips immediately
+        // without a risky background refetch that could return 401 and log
+        // the user out before the redirect fires.
+        queryClient.setQueryData(["/api/auth/me"], (old: any) =>
+          old ? { ...old, user: { ...old.user, onboardingComplete: true } } : old
+        );
         setComplete(true);
         setTimeout(() => setLocation("/dashboard"), 1200);
       } else if (step === 4) {
@@ -165,7 +170,9 @@ export default function Onboarding() {
         await apiRequest("POST", "/api/onboarding/client", clientData);
         try { await apiRequest("POST", "/api/legal/accept", { documentType: "CLIENT_WAIVER", version: LEGAL_VERSION }); } catch {}
         await apiRequest("POST", "/api/onboarding/complete", {});
-        await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        queryClient.setQueryData(["/api/auth/me"], (old: any) =>
+          old ? { ...old, user: { ...old.user, onboardingComplete: true } } : old
+        );
         setComplete(true);
         setTimeout(() => setLocation("/dashboard"), 1200);
       }

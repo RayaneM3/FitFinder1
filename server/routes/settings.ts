@@ -4,7 +4,7 @@ import { requireAuth } from "../middleware";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { uploadImage, deleteImage, R2_PUBLIC_URL } from "../upload";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { sanitizeObject } from "../utils/sanitize";
 import * as cache from "../lib/cache";
 
@@ -14,6 +14,11 @@ const sensitiveOpLimiter = rateLimit({
   message: { message: "Rate limit exceeded for this operation. Try again later." },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    const cfIp = req.headers["cf-connecting-ip"];
+    if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
+    return ipKeyGenerator(req.ip ?? "unknown");
+  },
 });
 
 const router = Router();
