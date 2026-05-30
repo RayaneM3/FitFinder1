@@ -49,11 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (data) => {
       // Hydrate the cache directly from the sign-in response so the redirect
       // fires immediately without depending on a second cross-origin /me fetch.
+      // Do NOT invalidate here — a failed background refetch would immediately
+      // clear the user and log them back out before the session cookie is read.
       if (data?.user) {
         queryClient.setQueryData(["/api/auth/me"], data);
       }
-      // Also invalidate so the query stays fresh (background refetch).
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
   });
 
@@ -63,11 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json() as Promise<{ user: AuthUser; profile: any } | null>;
     },
     onSuccess: (data) => {
-      // Same pattern: hydrate immediately, then schedule a background refresh.
+      // Same pattern: hydrate immediately, no invalidation.
       if (data?.user) {
         queryClient.setQueryData(["/api/auth/me"], data);
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
   });
 

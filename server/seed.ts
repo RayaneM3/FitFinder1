@@ -9,12 +9,29 @@ import { eq } from "drizzle-orm";
  */
 export async function runMigrationsIfNeeded() {
   try {
+    // Add columns to users table that were added after initial production deploy
     await pool.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at TIMESTAMP;
     `);
-    console.log("[migrate] Schema columns verified/added.");
+
+    // Create the session table that connect-pg-simple needs.
+    // createTableIfMissing:true reads table.sql from disk — if that ever fails
+    // silently (bundling, permissions), sessions are never persisted and every
+    // request returns 401. Creating it here guarantees it exists before any
+    // request is handled.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid"    varchar      NOT NULL,
+        "sess"   json         NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+      );
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+    `);
+
+    console.log("[migrate] Schema verified/applied.");
   } catch (e) {
     console.error("[migrate] Migration failed:", e);
   }
