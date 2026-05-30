@@ -12,9 +12,13 @@ export function useWebSocket(isAuthenticated: boolean) {
     if (!isAuthenticated) return;
 
     let wsUrl: string;
-    if (API_BASE) {
-      // Cross-origin: derive WS host from API_BASE (e.g. https://api.fitfinder.co → wss://api.fitfinder.co/ws)
-      const url = new URL(API_BASE);
+    // Prefer an explicit WS URL (set when HTTP is proxied same-origin but the
+    // WS server lives on a different host that the proxy can't upgrade to).
+    const explicitWs = import.meta.env.VITE_WS_URL as string | undefined;
+    const wsBase = explicitWs || API_BASE;
+    if (wsBase) {
+      // Cross-origin: derive WS host from the base URL (e.g. https://api.fitfinder.co → wss://api.fitfinder.co/ws)
+      const url = new URL(wsBase);
       const wsProt = url.protocol === "https:" ? "wss:" : "ws:";
       wsUrl = `${wsProt}//${url.host}/ws`;
     } else {
