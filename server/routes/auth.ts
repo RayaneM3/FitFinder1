@@ -142,6 +142,7 @@ router.post("/api/auth/logout", (req, res) => {
 });
 
 router.get("/api/auth/me", meLimiter, async (req, res) => {
+  console.log(`[auth/me] cookie=${req.headers.cookie ? "PRESENT" : "ABSENT"} userId=${req.session.userId ?? "none"}`);
   if (!req.session.userId) {
     return res.status(401).json({ message: "Not authenticated" });
   }

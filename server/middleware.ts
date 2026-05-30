@@ -14,6 +14,7 @@ export function asyncHandler(
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  console.log(`[requireAuth] ${req.method} ${req.path} cookie=${req.headers.cookie ? "PRESENT" : "ABSENT"} userId=${req.session.userId ?? "none"}`);
   if (!req.session.userId) {
     return res.status(401).json({ message: "Unauthorized" });
   }
