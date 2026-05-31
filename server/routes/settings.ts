@@ -111,12 +111,12 @@ router.post("/api/settings/avatar", requireAuth, async (req, res) => {
 });
 
 const trainerProfileSettingsSchema = z.object({
-  specialties: z.array(z.string()).optional(),
+  specialties: z.array(z.string().max(60)).max(30).optional(),
   yearsExperience: z.number().int().min(0).max(60).optional(),
-  certifications: z.array(z.string()).optional(),
-  priceMin: z.number().int().min(0).optional(),
-  priceMax: z.number().int().min(0).optional(),
-  availabilityNotes: z.string().optional(),
+  certifications: z.array(z.string().max(120)).max(30).optional(),
+  priceMin: z.number().int().min(0).max(100_000_000).optional(),
+  priceMax: z.number().int().min(0).max(100_000_000).optional(),
+  availabilityNotes: z.string().max(1000).optional(),
   coachingMode: z.enum(["ONLINE", "IN_PERSON", "HYBRID"]).optional(),
 });
 
@@ -130,15 +130,17 @@ router.patch("/api/settings/trainer-profile", requireAuth, async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.errors[0]?.message || "Validation error" });
     }
+    // Strip any HTML/script from free-text fields (consistent with /settings/profile)
+    const clean = sanitizeObject(parsed.data);
     const existing = await storage.getTrainerProfile(req.session.userId!);
     const tp = await storage.upsertTrainerProfile({
       userId: req.session.userId!,
-      specialties: parsed.data.specialties ?? existing?.specialties ?? [],
-      yearsExperience: parsed.data.yearsExperience ?? existing?.yearsExperience ?? 0,
-      certifications: parsed.data.certifications ?? existing?.certifications ?? [],
-      priceMin: parsed.data.priceMin ?? existing?.priceMin ?? 0,
-      priceMax: parsed.data.priceMax ?? existing?.priceMax ?? 0,
-      availabilityNotes: parsed.data.availabilityNotes ?? existing?.availabilityNotes ?? "",
+      specialties: clean.specialties ?? existing?.specialties ?? [],
+      yearsExperience: clean.yearsExperience ?? existing?.yearsExperience ?? 0,
+      certifications: clean.certifications ?? existing?.certifications ?? [],
+      priceMin: clean.priceMin ?? existing?.priceMin ?? 0,
+      priceMax: clean.priceMax ?? existing?.priceMax ?? 0,
+      availabilityNotes: clean.availabilityNotes ?? existing?.availabilityNotes ?? "",
       radiusKm: existing?.radiusKm ?? 0,
     });
     // Invalidate cached trainer profile and all listing pages
@@ -155,10 +157,10 @@ router.patch("/api/settings/trainer-profile", requireAuth, async (req, res) => {
 });
 
 const clientProfileSettingsSchema = z.object({
-  goals: z.array(z.string()).optional(),
+  goals: z.array(z.string().max(60)).max(20).optional(),
   experienceLevel: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]).optional(),
-  budgetMin: z.number().int().min(0).optional(),
-  budgetMax: z.number().int().min(0).optional(),
+  budgetMin: z.number().int().min(0).max(100_000_000).optional(),
+  budgetMax: z.number().int().min(0).max(100_000_000).optional(),
 });
 
 router.patch("/api/settings/client-profile", requireAuth, async (req, res) => {
@@ -171,13 +173,15 @@ router.patch("/api/settings/client-profile", requireAuth, async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ message: parsed.error.errors[0]?.message || "Validation error" });
     }
+    // Strip any HTML/script from free-text fields (consistent with /settings/profile)
+    const clean = sanitizeObject(parsed.data);
     const existing = await storage.getClientProfile(req.session.userId!);
     const cp = await storage.upsertClientProfile({
       userId: req.session.userId!,
-      goals: parsed.data.goals ?? existing?.goals ?? [],
-      experienceLevel: (parsed.data.experienceLevel ?? existing?.experienceLevel ?? "BEGINNER") as any,
-      budgetMin: parsed.data.budgetMin ?? existing?.budgetMin ?? 0,
-      budgetMax: parsed.data.budgetMax ?? existing?.budgetMax ?? 0,
+      goals: clean.goals ?? existing?.goals ?? [],
+      experienceLevel: (clean.experienceLevel ?? existing?.experienceLevel ?? "BEGINNER") as any,
+      budgetMin: clean.budgetMin ?? existing?.budgetMin ?? 0,
+      budgetMax: clean.budgetMax ?? existing?.budgetMax ?? 0,
     });
     return res.json(cp);
   } catch (e) {
