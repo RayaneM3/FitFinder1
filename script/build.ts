@@ -7,8 +7,6 @@ import { rm, readFile } from "fs/promises";
 // NOTE: connect-pg-simple is intentionally excluded — it reads table.sql
 // from disk at runtime via __dirname, which breaks when bundled.
 const allowlist = [
-  "@google/generative-ai",
-  "axios",
   "cors",
   "date-fns",
   "drizzle-orm",
@@ -16,19 +14,9 @@ const allowlist = [
   "express",
   "express-rate-limit",
   "express-session",
-  "jsonwebtoken",
-  "memorystore",
-  "multer",
-  "nanoid",
-  "nodemailer",
-  "openai",
-  "passport",
-  "passport-local",
   "pg",
   "stripe",
-  "uuid",
   "ws",
-  "xlsx",
   "zod",
   "zod-validation-error",
 ];
