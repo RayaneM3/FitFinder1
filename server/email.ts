@@ -7,6 +7,16 @@ const resend = process.env.RESEND_API_KEY
 const FROM_EMAIL = process.env.FROM_EMAIL || "Fit Finder <noreply@fitfinder.co>";
 const APP_URL = process.env.APP_URL || "https://fitfinder.co";
 
+// Loud startup diagnostic: without this, a missing RESEND_API_KEY means every
+// email (including password resets) is silently dropped with no obvious cause.
+if (!resend) {
+  const msg = "[email] RESEND_API_KEY is not set — NO emails will be sent (password resets, notifications, receipts are all disabled).";
+  if (process.env.NODE_ENV === "production") console.error(`⚠️  ${msg}`);
+  else console.warn(msg);
+} else {
+  console.log(`[email] Resend configured. Sending as: ${FROM_EMAIL}`);
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")

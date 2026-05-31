@@ -31,6 +31,22 @@ export async function runMigrationsIfNeeded() {
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
     `);
 
+    // Password reset tokens — defined in shared/schema.ts but never added to this
+    // runtime migration, so it was missing in production and the forgot-password
+    // flow silently failed (insert threw, caught, returned a fake "OK"). Create it
+    // here so the reset flow works without a manual drizzle-kit push.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
+        "id"         varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+        "user_id"    varchar      NOT NULL REFERENCES "users"("id"),
+        "token"      text         NOT NULL UNIQUE,
+        "expires_at" timestamp    NOT NULL,
+        "used_at"    timestamp,
+        "created_at" timestamp    NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "IDX_prt_user_id" ON "password_reset_tokens" ("user_id");
+    `);
+
     console.log("[migrate] Schema verified/applied.");
   } catch (e) {
     console.error("[migrate] Migration failed:", e);
