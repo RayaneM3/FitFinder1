@@ -12,6 +12,7 @@ interface AuthUser {
   image: string | null;
   onboardingComplete: boolean;
   isAdmin?: boolean;
+  emailVerified: boolean;
 }
 
 interface AuthContextType {

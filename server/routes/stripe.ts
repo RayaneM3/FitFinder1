@@ -16,8 +16,8 @@ router.get("/api/stripe/connect", requireAuth, async (req, res) => {
     if (!stripe || !process.env.STRIPE_CLIENT_ID) {
       return res.status(400).json({ message: "Stripe Connect not configured" });
     }
-    const user = await storage.getUser(req.session.userId!);
-    if (!user || (user.role !== "TRAINER" && user.role !== "BOTH")) {
+    const user = req.user!;
+    if (user.role !== "TRAINER" && user.role !== "BOTH") {
       return res.status(403).json({ message: "Only trainers can connect Stripe" });
     }
     const appUrl = process.env.APP_URL || `https://${req.headers.host}`;
@@ -74,11 +74,8 @@ router.get("/api/stripe/callback", async (req, res) => {
 
 router.get("/api/stripe/status", requireAuth, async (req, res) => {
   try {
-    const tp = await storage.getTrainerProfile(req.session.userId!);
-    // accountId is intentionally excluded — it's sensitive and the frontend only needs connected:bool
-    return res.json({
-      connected: tp?.stripeAccountConnected ?? false,
-    });
+    const tp = await storage.getTrainerProfile(req.user!.id);
+    return res.json({ connected: tp?.stripeAccountConnected ?? false });
   } catch (e) {
     console.error("[GET /api/stripe/status]:", e);
     return res.status(500).json({ message: "Failed to load Stripe status" });
@@ -99,7 +96,7 @@ router.post("/api/checkout", requireAuth, async (req, res) => {
     }
 
     // Prevent trainers from purchasing their own plans
-    if (plan.trainerId === req.session.userId!) {
+    if (plan.trainerId === req.user!.id) {
       return res.status(400).json({ message: "You cannot purchase your own training plan" });
     }
 
@@ -111,7 +108,7 @@ router.post("/api/checkout", requireAuth, async (req, res) => {
         return res.status(503).json({ message: "Payment processing is not configured" });
       }
       const order = await storage.createOrder({
-        buyerId: req.session.userId!,
+        buyerId: req.user!.id,
         trainerId: plan.trainerId,
         planId: plan.id,
         amountCents: plan.priceCents,
@@ -132,7 +129,7 @@ router.post("/api/checkout", requireAuth, async (req, res) => {
     const platformFee = calculatePlatformFee(plan.priceCents);
 
     const order = await storage.createOrder({
-      buyerId: req.session.userId!,
+      buyerId: req.user!.id,
       trainerId: plan.trainerId,
       planId: plan.id,
       amountCents: plan.priceCents,
@@ -162,7 +159,7 @@ router.post("/api/checkout", requireAuth, async (req, res) => {
       cancel_url: `${appUrl}/profile/${plan.trainerId}?payment=cancelled`,
       metadata: {
         orderId: order.id,
-        buyerId: req.session.userId!,
+        buyerId: req.user!.id,
         trainerId: plan.trainerId,
         planId: plan.id,
       },

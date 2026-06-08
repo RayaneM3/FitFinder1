@@ -1,10 +1,17 @@
 import type { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
+import type { User } from "@shared/schema";
 
-/**
- * Wraps async route handlers to properly catch and forward errors to Express.
- * Existing routes should be migrated to use this wrapper over time.
- */
+// Attach the authenticated user to every protected request so route handlers
+// can read req.user without a second DB round-trip.
+declare global {
+  namespace Express {
+    interface Request {
+      user?: User;
+    }
+  }
+}
+
 export function asyncHandler(
   fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
 ) {
@@ -24,6 +31,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (user.bannedAt) {
     return res.status(403).json({ message: "Account suspended" });
   }
+  req.user = user;
   next();
 }
 
@@ -41,5 +49,6 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
   if (!user.isAdmin) {
     return res.status(403).json({ message: "Admin access required" });
   }
+  req.user = user;
   next();
 }

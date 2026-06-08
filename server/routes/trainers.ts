@@ -2,7 +2,8 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { exploreFiltersSchema } from "@shared/schema";
 import { z } from "zod";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import rateLimit from "express-rate-limit";
+import { cfAwareKeyGenerator } from "../utils/rate-limit";
 import * as cache from "../lib/cache";
 
 const router = Router();
@@ -13,12 +14,7 @@ const trainersLimiter = rateLimit({
   message: { message: "Too many requests. Please slow down." },
   standardHeaders: true,
   legacyHeaders: false,
-  // Prefer the real client IP from Cloudflare when TRUST_PROXY is enabled.
-  keyGenerator: (req) => {
-    const cfIp = req.headers["cf-connecting-ip"];
-    if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
-    return ipKeyGenerator(req.ip ?? "unknown");
-  },
+  keyGenerator: cfAwareKeyGenerator,
 });
 
 // ── Cache TTLs ────────────────────────────────────────────────────────────────

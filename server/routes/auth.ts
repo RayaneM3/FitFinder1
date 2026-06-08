@@ -4,13 +4,14 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { signupSchema, signinSchema } from "@shared/schema";
 import { z } from "zod";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import rateLimit from "express-rate-limit";
 import { db, pool } from "../db";
-import { passwordResetTokens } from "@shared/schema";
+import { passwordResetTokens, emailVerificationTokens } from "@shared/schema";
 import { eq, and, gt, isNull } from "drizzle-orm";
-import { sendEmail, passwordResetEmail } from "../email";
+import { sendEmail, passwordResetEmail, emailVerificationEmail } from "../email";
 import { sanitizeString } from "../utils/sanitize";
 import { safeOwnUserResponse } from "../utils/safe-user";
+import { cfAwareKeyGenerator } from "../utils/rate-limit";
 
 const router = Router();
 
@@ -20,24 +21,16 @@ const authLimiter = rateLimit({
   message: { message: "Too many attempts. Please try again in 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    const cfIp = req.headers["cf-connecting-ip"];
-    if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
-    return ipKeyGenerator(req.ip ?? "unknown");
-  },
+  keyGenerator: cfAwareKeyGenerator,
 });
 
 const meLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 120, // 2 req/sec — generous for page loads but blocks floods
+  max: 120,
   message: { message: "Too many requests" },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    const cfIp = req.headers["cf-connecting-ip"];
-    if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
-    return ipKeyGenerator(req.ip ?? "unknown");
-  },
+  keyGenerator: cfAwareKeyGenerator,
 });
 
 // ========== ACCOUNT LOCKOUT CONSTANTS ==========
@@ -60,6 +53,19 @@ router.post("/api/auth/signup", authLimiter, async (req, res) => {
       passwordHash,
       name: cleanName,
     });
+
+    // Send email verification (fire-and-forget — don't block signup on email failure)
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    db.insert(emailVerificationTokens)
+      .values({ userId: user.id, token: verifyToken, expiresAt: verifyExpiresAt })
+      .then(() => {
+        const FRONTEND_URL = process.env.FRONTEND_URL || process.env.APP_URL || "https://fitfinder.co";
+        const verifyUrl = `${FRONTEND_URL}/verify-email/${verifyToken}`;
+        const { subject, html } = emailVerificationEmail(verifyUrl);
+        return sendEmail(user.email, subject, html);
+      })
+      .catch((e) => console.error("[auth/signup] Failed to send verification email:", e));
 
     // Regenerate session to prevent session fixation
     const userId = user.id;
@@ -177,7 +183,7 @@ const forgotPasswordLimiter = rateLimit({
   keyGenerator: (req) => {
     const email = req.body?.email;
     if (typeof email === "string" && email) return email.toLowerCase().trim();
-    return ipKeyGenerator(req.ip ?? "unknown");
+    return req.ip ?? "unknown";
   },
   message: { message: "Too many reset requests. Please wait 15 minutes." },
   standardHeaders: true,
@@ -217,11 +223,7 @@ const resetPasswordLimiter = rateLimit({
   message: { message: "Too many attempts. Please wait 15 minutes." },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    const cfIp = req.headers["cf-connecting-ip"];
-    if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
-    return ipKeyGenerator(req.ip ?? "unknown");
-  },
+  keyGenerator: cfAwareKeyGenerator,
 });
 
 router.post("/api/auth/reset-password", resetPasswordLimiter, async (req, res) => {
@@ -273,6 +275,76 @@ router.post("/api/auth/reset-password", resetPasswordLimiter, async (req, res) =
   } catch (e) {
     console.error("[POST /api/auth/reset-password]:", e);
     return res.status(500).json({ message: "Failed to reset password" });
+  }
+});
+
+router.get("/api/auth/verify-email/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ message: "Invalid verification link" });
+    }
+
+    const [record] = await db
+      .select()
+      .from(emailVerificationTokens)
+      .where(
+        and(
+          eq(emailVerificationTokens.token, token),
+          isNull(emailVerificationTokens.usedAt),
+          gt(emailVerificationTokens.expiresAt, new Date()),
+        )
+      )
+      .limit(1);
+
+    if (!record) {
+      return res.status(400).json({ message: "This verification link is invalid or has expired" });
+    }
+
+    await storage.updateUser(record.userId, { emailVerified: true });
+    await db
+      .update(emailVerificationTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(emailVerificationTokens.id, record.id));
+
+    return res.json({ message: "Email verified successfully" });
+  } catch (e) {
+    console.error("[GET /api/auth/verify-email]:", e);
+    return res.status(500).json({ message: "Failed to verify email" });
+  }
+});
+
+const resendVerificationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  message: { message: "Too many requests. Please wait 15 minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: cfAwareKeyGenerator,
+});
+
+router.post("/api/auth/resend-verification", resendVerificationLimiter, async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Not authenticated" });
+  }
+  try {
+    const user = await storage.getUser(req.session.userId);
+    if (!user) return res.status(401).json({ message: "User not found" });
+    if (user.emailVerified) return res.json({ message: "Email already verified" });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await db.insert(emailVerificationTokens).values({ userId: user.id, token, expiresAt });
+
+    const FRONTEND_URL = process.env.FRONTEND_URL || process.env.APP_URL || "https://fitfinder.co";
+    const verifyUrl = `${FRONTEND_URL}/verify-email/${token}`;
+    const { subject, html } = emailVerificationEmail(verifyUrl);
+    await sendEmail(user.email, subject, html);
+
+    return res.json({ message: "Verification email sent" });
+  } catch (e) {
+    console.error("[POST /api/auth/resend-verification]:", e);
+    return res.status(500).json({ message: "Failed to send verification email" });
   }
 });
 

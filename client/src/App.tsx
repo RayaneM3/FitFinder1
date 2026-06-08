@@ -30,6 +30,7 @@ import LegalCommunityGuidelines from "@/pages/legal/community-guidelines";
 import LegalContactSupport from "@/pages/legal/contact-support";
 import Admin from "@/pages/admin";
 import ResetPassword from "@/pages/reset-password";
+import VerifyEmail from "@/pages/verify-email";
 
 function Router() {
   return (
@@ -61,6 +62,7 @@ function Router() {
       <Route path="/admin" component={Admin} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/reset-password/:token" component={ResetPassword} />
+      <Route path="/verify-email/:token" component={VerifyEmail} />
       <Route component={NotFound} />
     </Switch>
   );

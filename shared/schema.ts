@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   role: roleEnum("role"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   isAdmin: boolean("is_admin").notNull().default(false),
+  emailVerified: boolean("email_verified").notNull().default(false),
   bannedAt: timestamp("banned_at"),
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until"),
@@ -178,6 +179,15 @@ export const reviews = pgTable("reviews", {
   index("review_trainer_idx").on(table.trainerId),
 ]);
 
+export const emailVerificationTokens = pgTable("email_verification_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const passwordResetTokens = pgTable("password_reset_tokens", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
@@ -229,6 +239,7 @@ export type LegalAcceptance = typeof legalAcceptances.$inferSelect;
 export type InsertLegalAcceptance = z.infer<typeof insertLegalAcceptanceSchema>;
 export type Review = typeof reviews.$inferSelect;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
+export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
 
 // --- Validation Schemas for API ---
 export const signupSchema = z.object({

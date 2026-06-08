@@ -204,19 +204,36 @@ router.delete("/api/admin/users/:id", requireAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query(`DELETE FROM messages WHERE sender_id = $1`, [id]);
+      // Tokens
+      await client.query(`DELETE FROM email_verification_tokens WHERE user_id = $1`, [id]);
+      await client.query(`DELETE FROM password_reset_tokens WHERE user_id = $1`, [id]);
+      // Messages & conversations — must delete messages before conversations (FK)
+      await client.query(
+        `DELETE FROM messages WHERE conversation_id IN (
+           SELECT id FROM conversations WHERE client_id = $1 OR trainer_id = $1
+         )`, [id]
+      );
       await client.query(`DELETE FROM conversations WHERE client_id = $1 OR trainer_id = $1`, [id]);
-      await client.query(`DELETE FROM orders WHERE buyer_id = $1 OR trainer_id = $1`, [id]);
+      // Reviews before orders (FK: reviews.order_id → orders.id)
       await client.query(`DELETE FROM reviews WHERE reviewer_id = $1 OR trainer_id = $1`, [id]);
+      // Plans — nullify FK on orders then delete plans
+      await client.query(
+        `UPDATE orders SET plan_id = NULL WHERE plan_id IN (SELECT id FROM plans WHERE trainer_id = $1)`,
+        [id]
+      );
+      await client.query(`DELETE FROM plans WHERE trainer_id = $1`, [id]);
+      // Orders (both sides)
+      await client.query(`DELETE FROM orders WHERE buyer_id = $1 OR trainer_id = $1`, [id]);
+      // Supporting tables
       await client.query(`DELETE FROM favorites WHERE user_id = $1 OR trainer_id = $1`, [id]);
       await client.query(`DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`, [id]);
       await client.query(`DELETE FROM reports WHERE reporter_id = $1 OR reported_id = $1`, [id]);
       await client.query(`DELETE FROM legal_acceptances WHERE user_id = $1`, [id]);
-      await client.query(`DELETE FROM password_reset_tokens WHERE user_id = $1`, [id]);
+      // Profiles
       await client.query(`DELETE FROM client_profiles WHERE user_id = $1`, [id]);
       await client.query(`DELETE FROM trainer_profiles WHERE user_id = $1`, [id]);
       await client.query(`DELETE FROM profiles WHERE user_id = $1`, [id]);
-      // Invalidate sessions using JSONB operator (safe, no full table scan)
+      // Sessions
       await client.query(`DELETE FROM session WHERE sess->>'userId' = $1`, [id]);
       await client.query(`DELETE FROM users WHERE id = $1`, [id]);
       await client.query("COMMIT");

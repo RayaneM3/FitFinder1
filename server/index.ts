@@ -1,7 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import rateLimit from "express-rate-limit";
+import { cfAwareKeyGenerator } from "./utils/rate-limit";
 import * as Sentry from "@sentry/node";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -160,13 +161,7 @@ if (!isStaging) {
     legacyHeaders: false,
     skip: (req) =>
       req.path === "/api/health" || req.path === "/api/stripe/webhook",
-    // When behind Cloudflare, use CF-Connecting-IP as the rate-limit key so
-    // Cloudflare's own IPs don't get throttled instead of the real client.
-    keyGenerator: (req) => {
-      const cfIp = req.headers["cf-connecting-ip"];
-      if (typeof cfIp === "string" && cfIp) return ipKeyGenerator(cfIp);
-      return ipKeyGenerator(req.ip ?? "unknown");
-    },
+    keyGenerator: cfAwareKeyGenerator,
   });
   app.use("/api", apiLimiter);
 }

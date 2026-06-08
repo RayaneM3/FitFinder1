@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, API_BASE } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Trash2, Camera, Plus, X, AlertTriangle, ExternalLink, CheckCircle2, CreditCard, Check } from "lucide-react";
+import { Loader2, Trash2, Camera, Plus, X, AlertTriangle, ExternalLink, CheckCircle2, CreditCard, Check, Mail } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 
 const LANGUAGES = ["English", "Spanish", "French", "Mandarin", "Hindi", "Russian", "Portuguese", "Arabic", "German", "Japanese"];
@@ -23,6 +23,40 @@ const ALL_SPECIALTIES = [
   "Rehab & Mobility", "Sports Performance",
 ];
 const ALL_GOALS = ["Lose Weight", "Build Muscle", "Improve Fitness", "Train for Sport", "Rehabilitation", "Increase Strength", "Better Nutrition", "Flexibility & Mobility"];
+
+function EmailVerificationBanner() {
+  const { toast } = useToast();
+  const [sent, setSent] = useState(false);
+  const resend = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/auth/resend-verification"),
+    onSuccess: () => { setSent(true); toast({ title: "Verification email sent", description: "Check your inbox." }); },
+    onError: () => toast({ title: "Failed to send", description: "Please try again later.", variant: "destructive" }),
+  });
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3 mb-6 text-sm">
+      <Mail className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-amber-800 dark:text-amber-300">Email not verified</p>
+        <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+          Please verify your email address to secure your account.
+        </p>
+      </div>
+      {!sent && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 h-7 text-xs border-amber-300 bg-white hover:bg-amber-50 dark:bg-transparent dark:border-amber-700"
+          disabled={resend.isPending}
+          onClick={() => resend.mutate()}
+        >
+          {resend.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Resend"}
+        </Button>
+      )}
+      {sent && <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600 mt-0.5" />}
+    </div>
+  );
+}
 
 export default function Settings() {
   const { user, isAuthenticated } = useAuth();
@@ -305,6 +339,8 @@ export default function Settings() {
     <Layout>
       <div className="container mx-auto px-4 md:px-8 py-8 max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500">
         <h1 className="text-3xl font-bold tracking-tight mb-8">Settings</h1>
+
+        {user && !user.emailVerified && <EmailVerificationBanner />}
 
         <Tabs defaultValue="profile" className="w-full">
           {/* Scrollable on narrow screens so 5-6 tab labels don't get squashed */}

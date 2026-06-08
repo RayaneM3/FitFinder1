@@ -33,29 +33,27 @@ router.post("/api/conversations", requireAuth, async (req, res) => {
       return res.status(400).json({ message: parsed.error.errors[0]?.message || "trainerId is required" });
     }
     const { trainerId } = parsed.data;
-    const userId = req.session.userId!;
+    const user = req.user!;
 
-    if (trainerId === userId) {
+    if (trainerId === user.id) {
       return res.status(400).json({ message: "You cannot start a conversation with yourself" });
     }
 
-    const user = await storage.getUser(userId);
-    if (!user || (user.role !== "CLIENT" && user.role !== "BOTH")) {
+    if (user.role !== "CLIENT" && user.role !== "BOTH") {
       return res.status(403).json({ message: "Only clients can initiate conversations" });
     }
 
-    // Only allow messaging trainers who have completed onboarding
     const trainer = await storage.getUser(trainerId);
     if (!trainer || !trainer.onboardingComplete || (trainer.role !== "TRAINER" && trainer.role !== "BOTH")) {
       return res.status(404).json({ message: "Trainer not found" });
     }
 
-    const blocked = await storage.isBlocked(userId, trainerId);
+    const blocked = await storage.isBlocked(user.id, trainerId);
     if (blocked) return res.status(403).json({ message: "Cannot message this user" });
 
-    let convo = await storage.findConversation(userId, trainerId);
+    let convo = await storage.findConversation(user.id, trainerId);
     if (!convo) {
-      convo = await storage.createConversation({ clientId: userId, trainerId });
+      convo = await storage.createConversation({ clientId: user.id, trainerId });
     }
 
     return res.json(convo);
@@ -67,7 +65,7 @@ router.post("/api/conversations", requireAuth, async (req, res) => {
 
 router.get("/api/conversations", requireAuth, async (req, res) => {
   try {
-    const convos = await storage.getUserConversations(req.session.userId!);
+    const convos = await storage.getUserConversations(req.user!.id);
     return res.json(convos);
   } catch (e) {
     console.error("[GET /api/conversations]:", e);
@@ -80,7 +78,7 @@ router.post("/api/conversations/:id/read", requireAuth, async (req, res) => {
     const convoId = req.params.id as string;
     const convo = await storage.getConversation(convoId);
     if (!convo) return res.status(404).json({ message: "Not found" });
-    const userId = req.session.userId!;
+    const userId = req.user!.id;
     if (convo.clientId !== userId && convo.trainerId !== userId) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -100,7 +98,7 @@ router.get("/api/messages", requireAuth, async (req, res) => {
     const convo = await storage.getConversation(conversationId as string);
     if (!convo) return res.status(404).json({ message: "Conversation not found" });
 
-    const userId = req.session.userId!;
+    const userId = req.user!.id;
     if (convo.clientId !== userId && convo.trainerId !== userId) {
       return res.status(403).json({ message: "Not a participant" });
     }
@@ -128,7 +126,7 @@ router.post("/api/messages", requireAuth, async (req, res) => {
     const convo = await storage.getConversation(conversationId);
     if (!convo) return res.status(404).json({ message: "Conversation not found" });
 
-    const userId = req.session.userId!;
+    const userId = req.user!.id;
     if (convo.clientId !== userId && convo.trainerId !== userId) {
       return res.status(403).json({ message: "Not a participant" });
     }
@@ -144,17 +142,16 @@ router.post("/api/messages", requireAuth, async (req, res) => {
       content: cleanContent,
     });
 
-    // Notify recipient via email if they're offline and cooldown has passed (fire-and-forget)
-    const recipientId = convo.clientId === userId ? convo.trainerId : convo.clientId;
-    const cooldownKey = `${recipientId}:${conversationId}`;
+    // Notify recipient via email if offline and cooldown has passed (fire-and-forget)
+    const cooldownKey = `${otherUserId}:${conversationId}`;
     const lastSent = lastEmailSent.get(cooldownKey) ?? 0;
-    if (!isUserOnline(recipientId) && Date.now() - lastSent > EMAIL_COOLDOWN_MS) {
+    if (!isUserOnline(otherUserId) && Date.now() - lastSent > EMAIL_COOLDOWN_MS) {
       lastEmailSent.set(cooldownKey, Date.now());
-      Promise.all([storage.getUser(recipientId), storage.getUser(userId)]).then(([recipientUser, senderUser]) => {
-        if (recipientUser?.email && senderUser) {
+      storage.getUser(otherUserId).then((recipientUser) => {
+        if (recipientUser?.email) {
           const appUrl = process.env.FRONTEND_URL || process.env.APP_URL || `https://${req.headers.host}`;
           const { subject, html } = newMessageEmail(
-            recipientUser.name, senderUser.name, cleanContent,
+            recipientUser.name, req.user!.name, cleanContent,
             `${appUrl}/messages/${conversationId}`
           );
           sendEmail(recipientUser.email, subject, html);
@@ -176,7 +173,10 @@ router.post("/api/block", requireAuth, async (req, res) => {
       return res.status(400).json({ message: "blockedId is required" });
     }
     const { blockedId } = parsed.data;
-    await storage.createBlock({ blockerId: req.session.userId!, blockedId });
+    if (blockedId === req.user!.id) {
+      return res.status(400).json({ message: "You cannot block yourself" });
+    }
+    await storage.createBlock({ blockerId: req.user!.id, blockedId });
     return res.json({ success: true });
   } catch (e) {
     console.error("[POST /api/block]:", e);
@@ -186,7 +186,7 @@ router.post("/api/block", requireAuth, async (req, res) => {
 
 router.delete("/api/block/:blockedId", requireAuth, async (req, res) => {
   try {
-    await storage.removeBlock(req.session.userId!, req.params.blockedId as string);
+    await storage.removeBlock(req.user!.id, req.params.blockedId as string);
     return res.json({ success: true });
   } catch (e) {
     console.error("[DELETE /api/block/:blockedId]:", e);
@@ -196,7 +196,7 @@ router.delete("/api/block/:blockedId", requireAuth, async (req, res) => {
 
 router.get("/api/blocked", requireAuth, async (req, res) => {
   try {
-    const blockedUsers = await storage.getBlockedUsers(req.session.userId!);
+    const blockedUsers = await storage.getBlockedUsers(req.user!.id);
     return res.json(blockedUsers);
   } catch (e) {
     console.error("[GET /api/blocked]:", e);
@@ -211,9 +211,9 @@ router.post("/api/report", requireAuth, async (req, res) => {
       return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid report data" });
     }
     const { reportedId, category, details } = parsed.data;
-    if (reportedId === req.session.userId) return res.status(400).json({ message: "Cannot report yourself" });
+    if (reportedId === req.user!.id) return res.status(400).json({ message: "Cannot report yourself" });
     await storage.createReport({
-      reporterId: req.session.userId!,
+      reporterId: req.user!.id,
       reportedId,
       category: category as any,
       details: details ?? "",

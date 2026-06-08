@@ -20,6 +20,7 @@ export function safeOwnUserResponse(user: any) {
     image: user.image,
     onboardingComplete: user.onboardingComplete,
     isAdmin: user.isAdmin,
+    emailVerified: user.emailVerified,
     // NEVER include: passwordHash, bannedAt
   };
 }

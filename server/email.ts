@@ -126,6 +126,17 @@ export function orderPaidTrainerEmail(trainerName: string, buyerName: string, pl
   return { subject, html };
 }
 
+export function emailVerificationEmail(verifyUrl: string) {
+  const subject = "Verify your Fit Finder email";
+  const html = emailWrapper(`
+    <h2 style="margin: 0 0 12px; font-size: 20px; font-weight: 600;">Verify your email address</h2>
+    <p style="margin: 0 0 16px; color: #4b5563;">Click the button below to confirm your email and activate your Fit Finder account. This link expires in 24 hours.</p>
+    ${ctaButton(verifyUrl, "Verify Email")}
+    <p style="margin: 0; font-size: 14px; color: #6b7280;">If you didn't create an account, you can safely ignore this email.</p>
+  `, "Confirm your Fit Finder account");
+  return { subject, html };
+}
+
 export function passwordResetEmail(resetUrl: string) {
   const subject = "Reset your Fit Finder password";
   const html = emailWrapper(`

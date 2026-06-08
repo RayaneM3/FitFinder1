@@ -34,7 +34,11 @@ async function getSessionUserId(cookieHeader: string | undefined): Promise<strin
     sid = sid.slice(2);
   }
 
-  const secret = process.env.SESSION_SECRET || "fit-finder-dev-secret-change-in-production";
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    console.error("[ws] SESSION_SECRET is not set — rejecting WebSocket connection");
+    return null;
+  }
   const unsigned = signature.unsign(sid, secret);
   if (unsigned === false) return null;
 

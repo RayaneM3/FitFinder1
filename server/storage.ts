@@ -82,15 +82,31 @@ export interface IStorage {
   getPlan(id: string): Promise<Plan | undefined>;
   createPlan(data: InsertPlan): Promise<Plan>;
   updatePlan(id: string, data: Partial<Plan>): Promise<Plan | undefined>;
+  deletePlan(id: string): Promise<void>;
 
   // Orders
   createOrder(data: InsertOrder): Promise<Order>;
   getOrder(id: string): Promise<Order | undefined>;
   getOrderByStripeSession(sessionId: string): Promise<Order | undefined>;
-  updateOrderStatus(id: string, status: string): Promise<void>;
+  updateOrderStatus(id: string, status: "PENDING" | "PAID" | "CANCELED"): Promise<void>;
   getUserOrders(userId: string): Promise<any[]>;
   getTrainerOrders(trainerId: string): Promise<any[]>;
   hasActiveOrder(buyerId: string, trainerId: string): Promise<boolean>;
+  getTrainerEarnings(trainerId: string): Promise<{
+    totalRevenueCents: number;
+    paidOrderCount: number;
+    pendingOrderCount: number;
+    thisMonthRevenueCents: number;
+    lastMonthRevenueCents: number;
+  }>;
+  getTrainerClients(trainerId: string): Promise<{
+    id: string;
+    name: string;
+    image: string | null;
+    paidAt: Date;
+    amountCents: number;
+    planTitle: string | null;
+  }[]>;
 
   // Favorites
   toggleFavorite(userId: string, trainerId: string): Promise<boolean>;
@@ -130,6 +146,7 @@ const USER_COLUMNS = {
   role: users.role,
   onboardingComplete: users.onboardingComplete,
   isAdmin: users.isAdmin,
+  emailVerified: users.emailVerified,
   bannedAt: users.bannedAt,
   failedLoginAttempts: users.failedLoginAttempts,
   lockedUntil: users.lockedUntil,
@@ -539,6 +556,12 @@ export class DatabaseStorage implements IStorage {
     return plan;
   }
 
+  async deletePlan(id: string) {
+    // Nullify the FK on orders before deleting so order history is preserved
+    await db.update(orders).set({ planId: null }).where(eq(orders.planId, id));
+    await db.delete(plans).where(eq(plans.id, id));
+  }
+
   // --- Orders ---
   async createOrder(data: InsertOrder) {
     const [order] = await db.insert(orders).values(data).returning();
@@ -555,8 +578,8 @@ export class DatabaseStorage implements IStorage {
     return order;
   }
 
-  async updateOrderStatus(id: string, status: string) {
-    await db.update(orders).set({ status: status as any, updatedAt: new Date() }).where(eq(orders.id, id));
+  async updateOrderStatus(id: string, status: "PENDING" | "PAID" | "CANCELED") {
+    await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, id));
   }
 
   async getUserOrders(userId: string) {
@@ -599,6 +622,46 @@ export class DatabaseStorage implements IStorage {
     const result = await db.select().from(orders)
       .where(and(eq(orders.buyerId, buyerId), eq(orders.trainerId, trainerId), eq(orders.status, "PAID")));
     return result.length > 0;
+  }
+
+  async getTrainerEarnings(trainerId: string) {
+    const result = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(amount_cents) FILTER (WHERE status = 'PAID'), 0)::int           AS total_revenue_cents,
+        COUNT(*)              FILTER (WHERE status = 'PAID')::int                     AS paid_order_count,
+        COUNT(*)              FILTER (WHERE status = 'PENDING')::int                  AS pending_order_count,
+        COALESCE(SUM(amount_cents) FILTER (WHERE status = 'PAID'
+          AND created_at >= date_trunc('month', now())), 0)::int                      AS this_month_revenue_cents,
+        COALESCE(SUM(amount_cents) FILTER (WHERE status = 'PAID'
+          AND created_at >= date_trunc('month', now() - interval '1 month')
+          AND created_at <  date_trunc('month', now())), 0)::int                      AS last_month_revenue_cents
+      FROM orders
+      WHERE trainer_id = ${trainerId}
+    `);
+    const row = (result.rows[0] ?? {}) as Record<string, unknown>;
+    return {
+      totalRevenueCents:      Number(row.total_revenue_cents      ?? 0),
+      paidOrderCount:         Number(row.paid_order_count         ?? 0),
+      pendingOrderCount:      Number(row.pending_order_count      ?? 0),
+      thisMonthRevenueCents:  Number(row.this_month_revenue_cents ?? 0),
+      lastMonthRevenueCents:  Number(row.last_month_revenue_cents ?? 0),
+    };
+  }
+
+  async getTrainerClients(trainerId: string) {
+    return db.select({
+      id:          users.id,
+      name:        users.name,
+      image:       users.image,
+      paidAt:      orders.updatedAt,
+      amountCents: orders.amountCents,
+      planTitle:   plans.title,
+    })
+    .from(orders)
+    .innerJoin(users, eq(orders.buyerId, users.id))
+    .leftJoin(plans, eq(orders.planId, plans.id))
+    .where(and(eq(orders.trainerId, trainerId), eq(orders.status, "PAID")))
+    .orderBy(desc(orders.updatedAt));
   }
 
   // --- Favorites ---
