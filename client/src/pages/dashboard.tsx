@@ -439,32 +439,63 @@ function StatsSkeleton() {
   );
 }
 
-function TrainerStats({ leads, clients, revenue }: { leads: number; clients: number; revenue: number }) {
+function TrainerStats({
+  leads, clients, totalRevenueCents, thisMonthRevenueCents, lastMonthRevenueCents,
+}: {
+  leads: number;
+  clients: number;
+  totalRevenueCents: number;
+  thisMonthRevenueCents: number;
+  lastMonthRevenueCents: number;
+}) {
+  const PLATFORM_FEE = 0.872;
+  const netTotal    = Math.round(totalRevenueCents    * PLATFORM_FEE / 100);
+  const netThisMonth = Math.round(thisMonthRevenueCents * PLATFORM_FEE / 100);
+  const netLastMonth = Math.round(lastMonthRevenueCents * PLATFORM_FEE / 100);
+
   const animLeads   = useCountUp(leads);
   const animClients = useCountUp(clients);
-  const animRevenue = useCountUp(Math.round(revenue));
+  const animRevenue = useCountUp(netTotal);
+
+  const monthTrend = netLastMonth === 0
+    ? null
+    : Math.round(((netThisMonth - netLastMonth) / netLastMonth) * 100);
 
   return (
     <div className="grid sm:grid-cols-3 gap-3">
-      {[
-        { icon: <MessageSquare className="w-3.5 h-3.5" />, label: "Leads",          value: animLeads,   prefix: "",  testid: "text-leads-count",   delay: 0   },
-        { icon: <Users className="w-3.5 h-3.5" />,         label: "Active Clients", value: animClients, prefix: "",  testid: "text-clients-count", delay: 80  },
-        { icon: <CreditCard className="w-3.5 h-3.5" />,    label: "Revenue",        value: animRevenue, prefix: "$", testid: "text-revenue",       delay: 160 },
-      ].map(stat => (
-        <div
-          key={stat.label}
-          className="animate-in fade-in slide-in-from-bottom-3 duration-500 border rounded-xl p-4 transition-shadow hover:shadow-md"
-          style={{ animationDelay: `${stat.delay}ms`, animationFillMode: "both" }}
-        >
-          <div className="flex items-center gap-2 mb-1 text-muted-foreground">
-            {stat.icon}
-            <p className="text-xs">{stat.label}</p>
-          </div>
-          <p className="text-2xl font-bold tabular-nums" data-testid={stat.testid}>
-            {stat.prefix}{stat.value}
-          </p>
+      <div className="animate-in fade-in slide-in-from-bottom-3 duration-500 border rounded-xl p-4 transition-shadow hover:shadow-md" style={{ animationFillMode: "both" }}>
+        <div className="flex items-center gap-2 mb-1 text-muted-foreground">
+          <MessageSquare className="w-3.5 h-3.5" />
+          <p className="text-xs">Leads</p>
         </div>
-      ))}
+        <p className="text-2xl font-bold tabular-nums" data-testid="text-leads-count">{animLeads}</p>
+      </div>
+
+      <div className="animate-in fade-in slide-in-from-bottom-3 duration-500 border rounded-xl p-4 transition-shadow hover:shadow-md" style={{ animationDelay: "80ms", animationFillMode: "both" }}>
+        <div className="flex items-center gap-2 mb-1 text-muted-foreground">
+          <Users className="w-3.5 h-3.5" />
+          <p className="text-xs">Active Clients</p>
+        </div>
+        <p className="text-2xl font-bold tabular-nums" data-testid="text-clients-count">{animClients}</p>
+      </div>
+
+      <div className="animate-in fade-in slide-in-from-bottom-3 duration-500 border rounded-xl p-4 transition-shadow hover:shadow-md" style={{ animationDelay: "160ms", animationFillMode: "both" }}>
+        <div className="flex items-center gap-2 mb-1 text-muted-foreground">
+          <CreditCard className="w-3.5 h-3.5" />
+          <p className="text-xs">Net Revenue</p>
+        </div>
+        <p className="text-2xl font-bold tabular-nums" data-testid="text-revenue">${animRevenue}</p>
+        {netThisMonth > 0 && (
+          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            <span>${netThisMonth} this month</span>
+            {monthTrend !== null && (
+              <span className={monthTrend >= 0 ? "text-green-600" : "text-red-500"}>
+                ({monthTrend >= 0 ? "+" : ""}{monthTrend}% vs last month)
+              </span>
+            )}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -476,6 +507,33 @@ function TrainerDashboard() {
     queryKey: ["/api/dashboard/trainer"],
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/dashboard/trainer`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const { data: earnings } = useQuery<{
+    totalRevenueCents: number;
+    paidOrderCount: number;
+    pendingOrderCount: number;
+    thisMonthRevenueCents: number;
+    lastMonthRevenueCents: number;
+  }>({
+    queryKey: ["/api/trainer/earnings"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/api/trainer/earnings`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const { data: clients } = useQuery<{
+    id: string; name: string; image: string | null;
+    paidAt: string; amountCents: number; planTitle: string | null;
+  }[]>({
+    queryKey: ["/api/trainer/clients"],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/api/trainer/clients`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
@@ -519,8 +577,6 @@ function TrainerDashboard() {
 
   const hasPlans = !!myPlans?.length;
   const hasConversations = !!data?.leads?.length;
-  // Revenue shown after platform fee (87.2% of gross = 100% - 12.8% fee)
-  const revenue = ((data?.orders || []).filter((o: any) => o.status === "PAID").reduce((sum: number, o: any) => sum + o.amountCents, 0) * 0.872 / 100);
 
   if (isError) {
     return (
@@ -543,8 +599,10 @@ function TrainerDashboard() {
       {isLoading ? <StatsSkeleton /> : (
         <TrainerStats
           leads={data?.leads?.length || 0}
-          clients={data?.activeClients?.length || 0}
-          revenue={revenue}
+          clients={earnings?.paidOrderCount ?? data?.activeClients?.length ?? 0}
+          totalRevenueCents={earnings?.totalRevenueCents ?? 0}
+          thisMonthRevenueCents={earnings?.thisMonthRevenueCents ?? 0}
+          lastMonthRevenueCents={earnings?.lastMonthRevenueCents ?? 0}
         />
       )}
 
@@ -643,6 +701,35 @@ function TrainerDashboard() {
                 </div>
               </Link>
             ))}
+          </div>
+        </div>
+      )}
+
+      {clients && clients.length > 0 && (
+        <div className="border-t pt-5">
+          <h2 className="text-base font-bold mb-3">Active Clients</h2>
+          <div className="space-y-2">
+            {clients.slice(0, 5).map((client) => (
+              <div key={`${client.id}-${client.paidAt}`} className="flex items-center gap-3 p-3 border rounded-xl bg-card">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm overflow-hidden shrink-0">
+                  {client.image
+                    ? <img src={client.image} alt={client.name} className="w-full h-full object-cover" />
+                    : client.name?.charAt(0) || "?"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{client.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {client.planTitle ?? "Plan"} · ${Math.round(client.amountCents * 0.872 / 100)} net
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {new Date(client.paidAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </span>
+              </div>
+            ))}
+            {clients.length > 5 && (
+              <p className="text-xs text-muted-foreground text-center pt-1">+{clients.length - 5} more clients</p>
+            )}
           </div>
         </div>
       )}
