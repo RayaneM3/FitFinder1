@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { storage } from "../storage";
-import { requireAuth } from "../middleware";
+import { requireAuth, requireEmailVerified } from "../middleware";
 import { stripe, calculatePlatformFee } from "../stripe";
 import crypto from "crypto";
 import { z } from "zod";
@@ -82,7 +82,7 @@ router.get("/api/stripe/status", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/api/checkout", requireAuth, async (req, res) => {
+router.post("/api/checkout", requireAuth, requireEmailVerified, async (req, res) => {
   try {
     const bodyParsed = checkoutSchema.safeParse(req.body);
     if (!bodyParsed.success) {

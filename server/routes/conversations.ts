@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { storage } from "../storage";
-import { requireAuth } from "../middleware";
+import { requireAuth, requireEmailVerified } from "../middleware";
 import { sendEmail, newMessageEmail } from "../email";
 import { isUserOnline } from "../websocket";
 import { sanitizeString } from "../utils/sanitize";
@@ -26,7 +26,7 @@ const EMAIL_COOLDOWN_MS = 10 * 60 * 1000;
 
 const router = Router();
 
-router.post("/api/conversations", requireAuth, async (req, res) => {
+router.post("/api/conversations", requireAuth, requireEmailVerified, async (req, res) => {
   try {
     const parsed = createConversationSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -113,7 +113,7 @@ router.get("/api/messages", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/api/messages", requireAuth, async (req, res) => {
+router.post("/api/messages", requireAuth, requireEmailVerified, async (req, res) => {
   try {
     const { conversationId, content } = req.body;
     if (!conversationId || !content?.trim()) {

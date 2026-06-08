@@ -39,6 +39,15 @@ export default function Profile() {
     return () => { document.title = "Fit Finder"; };
   }, [trainer?.name]);
 
+  const warnUnverified = () => {
+    toast({
+      title: "Email not verified",
+      description: "Please verify your email address first. Check your inbox or resend from Settings.",
+      variant: "destructive",
+    });
+    setTimeout(() => setLocation("/settings"), 1800);
+  };
+
   const requestChatMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/conversations", { trainerId: id });
@@ -50,10 +59,7 @@ export default function Profile() {
     },
     onError: (err: any) => {
       const msg = err.message?.includes(":") ? err.message.split(":").slice(1).join(":").trim() : err.message;
-      if (msg?.includes("Unauthorized")) {
-        setLocation("/auth");
-        return;
-      }
+      if (msg?.includes("Unauthorized")) { setLocation("/auth"); return; }
       toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
@@ -238,7 +244,7 @@ export default function Profile() {
               <Button
                 size="lg"
                 className="w-full sm:w-auto rounded-xl h-12 px-8 shadow-md"
-                onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } requestChatMutation.mutate(); }}
+                onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } if (!user?.emailVerified) { warnUnverified(); return; } requestChatMutation.mutate(); }}
                 disabled={requestChatMutation.isPending || (user?.id === id)}
                 data-testid="button-request-chat"
               >
@@ -329,7 +335,7 @@ export default function Profile() {
                         <Button
                           className="w-full rounded-xl h-12 font-semibold"
                           variant={i === 0 ? "default" : "outline"}
-                          onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } purchaseMutation.mutate(plan.id); }}
+                          onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } if (!user?.emailVerified) { warnUnverified(); return; } purchaseMutation.mutate(plan.id); }}
                           disabled={purchaseMutation.isPending}
                           data-testid={`button-purchase-plan-${plan.id}`}
                         >
@@ -338,7 +344,7 @@ export default function Profile() {
                         <Button
                           className="w-full rounded-xl h-10 font-medium"
                           variant="ghost"
-                          onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } requestChatMutation.mutate(); }}
+                          onClick={() => { if (!isAuthenticated) { setLocation("/auth"); return; } if (!user?.emailVerified) { warnUnverified(); return; } requestChatMutation.mutate(); }}
                           disabled={requestChatMutation.isPending}
                           data-testid={`button-plan-chat-${plan.id}`}
                         >

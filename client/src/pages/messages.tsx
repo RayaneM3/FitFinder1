@@ -289,6 +289,14 @@ export default function Messages() {
   const handleSend = () => {
     const content = messageText.trim();
     if (!content || !activeConvoId || sendMutation.isPending) return;
+    if (!user?.emailVerified) {
+      toast({
+        title: "Email not verified",
+        description: "Please verify your email address before sending messages. Check Settings to resend.",
+        variant: "destructive",
+      });
+      return;
+    }
     setMessageText("");
     sendMutation.mutate(content);
   };

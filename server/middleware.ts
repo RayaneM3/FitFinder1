@@ -35,6 +35,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   next();
 }
 
+export function requireEmailVerified(req: Request, res: Response, next: NextFunction) {
+  if (!req.user?.emailVerified) {
+    return res.status(403).json({ message: "Please verify your email address before continuing.", code: "EMAIL_NOT_VERIFIED" });
+  }
+  next();
+}
+
 export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Unauthorized" });
