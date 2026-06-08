@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, MessageSquare, Heart, Award, ShieldAlert, ShieldCheck, Loader2, ArrowLeft, Star } from "lucide-react";
+import { MapPin, MessageSquare, Heart, Award, ShieldAlert, ShieldCheck, Loader2, ArrowLeft, Star, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, API_BASE } from "@/lib/queryClient";
@@ -35,9 +35,39 @@ export default function Profile() {
   });
 
   useEffect(() => {
-    document.title = trainer?.name ? `${trainer.name} | Fit Finder` : "Trainer Profile | Fit Finder";
-    return () => { document.title = "Fit Finder"; };
-  }, [trainer?.name]);
+    if (!trainer) return;
+    const title = `${trainer.name} | Fit Finder`;
+    const description = trainer.bio
+      ? trainer.bio.slice(0, 155)
+      : `${trainer.name} is a personal trainer on Fit Finder. View their specialties, plans, and reviews.`;
+
+    document.title = title;
+
+    const setMeta = (property: string, content: string) => {
+      let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
+      if (!el) { el = document.createElement("meta"); el.setAttribute("property", property); document.head.appendChild(el); }
+      el.setAttribute("content", content);
+    };
+    const setNameMeta = (name: string, content: string) => {
+      let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+      if (!el) { el = document.createElement("meta"); el.setAttribute("name", name); document.head.appendChild(el); }
+      el.setAttribute("content", content);
+    };
+
+    setNameMeta("description", description);
+    setMeta("og:title", title);
+    setMeta("og:description", description);
+    setMeta("og:type", "profile");
+    if (trainer.image) setMeta("og:image", trainer.image);
+
+    return () => {
+      document.title = "Fit Finder";
+      document.querySelector('meta[name="description"]')?.removeAttribute("content");
+      ["og:title", "og:description", "og:type", "og:image"].forEach(p =>
+        document.querySelector(`meta[property="${p}"]`)?.remove()
+      );
+    };
+  }, [trainer?.name, trainer?.bio, trainer?.image]);
 
   const warnUnverified = () => {
     toast({
@@ -278,6 +308,14 @@ export default function Profile() {
                 <h3 className="text-xl font-bold mb-4">Meet {trainer.name?.split(' ')[0]}</h3>
                 <p className="text-lg leading-relaxed text-muted-foreground">{trainer.bio || "This trainer hasn't added a bio yet."}</p>
               </div>
+              {trainer.availabilityNotes && (
+                <div className="rounded-2xl p-6 border bg-card">
+                  <h4 className="font-semibold flex items-center gap-2 mb-2">
+                    <Clock className="w-5 h-5 text-primary" /> Availability
+                  </h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">{trainer.availabilityNotes}</p>
+                </div>
+              )}
               <div className="bg-primary/5 rounded-2xl p-6 border border-primary/10">
                 <h4 className="font-semibold flex items-center gap-2 mb-2"><ShieldCheck className="w-5 h-5 text-primary" /> Location Privacy</h4>
                 <p className="text-sm text-muted-foreground">For your safety and the trainer's, exact training locations are only revealed after a chat request is accepted.</p>
