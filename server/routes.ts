@@ -174,6 +174,10 @@ ${allPages
         }
       }
     }
+    // TODO(refunds): when a charge is refunded/disputed, add a REFUNDED status to
+    // orderStatusEnum, handle `charge.refunded` here to flip order status, and
+    // update the avg-rating queries to exclude REFUNDED orders. Reviews remain
+    // visible but stop counting toward the trainer's average.
     if (event.type === "checkout.session.expired") {
       const session = event.data.object as Stripe.Checkout.Session;
       const orderId = session.metadata?.orderId;

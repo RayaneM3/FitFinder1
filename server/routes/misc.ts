@@ -103,7 +103,7 @@ router.post("/api/reviews", requireAuth, async (req, res) => {
     const order = await storage.getOrder(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (order.buyerId !== userId) return res.status(403).json({ message: "Not your order" });
-    if (order.status !== "PAID") return res.status(400).json({ message: "Can only review paid orders" });
+    if (order.status !== "PAID") return res.status(403).json({ message: "A completed payment is required before leaving a review.", code: "PAYMENT_REQUIRED" });
 
     const existing = await storage.getReviewByOrder(orderId);
     if (existing) return res.status(409).json({ message: "You have already reviewed this order" });

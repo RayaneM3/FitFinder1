@@ -333,8 +333,8 @@ export class DatabaseStorage implements IStorage {
       priceMin: trainerProfiles.priceMin,
       priceMax: trainerProfiles.priceMax,
       createdAt: users.createdAt,
-      averageRating: sql<number>`COALESCE((SELECT avg(rating) FROM reviews WHERE trainer_id = ${users.id}), 0)`,
-      reviewCount: sql<number>`(SELECT count(*)::int FROM reviews WHERE trainer_id = ${users.id})`,
+      averageRating: sql<number>`COALESCE((SELECT avg(r.rating) FROM reviews r INNER JOIN orders o ON o.id = r.order_id AND o.status = 'PAID' WHERE r.trainer_id = ${users.id}), 0)`,
+      reviewCount: sql<number>`(SELECT count(*)::int FROM reviews r INNER JOIN orders o ON o.id = r.order_id AND o.status = 'PAID' WHERE r.trainer_id = ${users.id})`,
       total: sql<number>`count(*) OVER()`,
     };
 
@@ -601,6 +601,7 @@ export class DatabaseStorage implements IStorage {
       planTitle: plans.title,
       trainerName: users.name,
       hasReviewed: sql<boolean>`EXISTS(SELECT 1 FROM reviews WHERE order_id = ${orders.id})`,
+      canReview: sql<boolean>`${orders.status} = 'PAID' AND NOT EXISTS(SELECT 1 FROM reviews WHERE order_id = ${orders.id})`,
     })
     .from(orders)
     .leftJoin(plans, eq(orders.planId, plans.id))
@@ -792,7 +793,10 @@ export class DatabaseStorage implements IStorage {
     const avgResult = await db.select({
       avg: sql<number>`COALESCE(avg(${reviews.rating}), 0)`,
       count: sql<number>`count(*)::int`,
-    }).from(reviews).where(eq(reviews.trainerId, trainerId));
+    })
+    .from(reviews)
+    .innerJoin(orders, and(eq(orders.id, reviews.orderId), eq(orders.status, "PAID")))
+    .where(eq(reviews.trainerId, trainerId));
 
     return {
       reviews: results,
@@ -810,7 +814,10 @@ export class DatabaseStorage implements IStorage {
     const result = await db.select({
       avg: sql<number>`COALESCE(avg(${reviews.rating}), 0)`,
       count: sql<number>`count(*)::int`,
-    }).from(reviews).where(eq(reviews.trainerId, trainerId));
+    })
+    .from(reviews)
+    .innerJoin(orders, and(eq(orders.id, reviews.orderId), eq(orders.status, "PAID")))
+    .where(eq(reviews.trainerId, trainerId));
     return {
       avg: Number(Number(result[0]?.avg || 0).toFixed(1)),
       count: Number(result[0]?.count || 0),

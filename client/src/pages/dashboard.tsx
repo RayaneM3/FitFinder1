@@ -1055,7 +1055,16 @@ function OrderCard({ order }: { order: any }) {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/client"] });
     },
     onError: (err: any) => {
-      const msg = err.message?.includes(":") ? err.message.split(":").slice(1).join(":").trim() : err.message;
+      // Error message format from apiRequest: "<status>: <json body>"
+      const rawBody = err.message?.includes(":") ? err.message.split(":").slice(1).join(":").trim() : "";
+      let body: Record<string, string> = {};
+      try { body = rawBody ? JSON.parse(rawBody) : {}; } catch { /* not JSON */ }
+      const msg = body.message || rawBody || err.message;
+
+      if (body.code === "PAYMENT_REQUIRED") {
+        toast({ title: "Payment required", description: "Reviews are only available after a completed purchase.", variant: "destructive" });
+        return;
+      }
       if (msg?.includes("already reviewed")) {
         setHasReviewed(true);
         setReviewOpen(false);
@@ -1071,7 +1080,7 @@ function OrderCard({ order }: { order: any }) {
         <p className="text-xs text-muted-foreground">with {order.trainerName}</p>
       </div>
       <div className="flex items-center gap-2">
-        {order.status === "PAID" && !hasReviewed && (
+        {(order.canReview ?? (order.status === "PAID" && !hasReviewed)) && (
           <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="rounded-xl text-xs h-7 gap-1">
