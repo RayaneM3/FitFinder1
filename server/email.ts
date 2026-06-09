@@ -126,6 +126,18 @@ export function orderPaidTrainerEmail(trainerName: string, buyerName: string, pl
   return { subject, html };
 }
 
+export function reviewReminderEmail(buyerName: string, trainerName: string, planTitle: string, reviewUrl: string) {
+  const subject = `How was your session with ${trainerName}? Leave a review`;
+  const html = emailWrapper(`
+    <h2 style="margin: 0 0 12px; font-size: 20px; font-weight: 600;">Hi ${escapeHtml(buyerName)},</h2>
+    <p style="margin: 0 0 16px; color: #4b5563;">It's been a couple of days since you purchased <strong>${escapeHtml(planTitle)}</strong> from ${escapeHtml(trainerName)}. We'd love to hear how it went!</p>
+    <p style="margin: 0 0 24px; color: #4b5563;">Your review helps other clients find the right trainer and rewards great coaches for their work.</p>
+    ${ctaButton(reviewUrl, "Leave a Review")}
+    <p style="margin: 0; font-size: 13px; color: #9ca3af;">Only takes 30 seconds. Your honest feedback matters.</p>
+  `, `How was ${trainerName}? Share your experience.`);
+  return { subject, html };
+}
+
 export function emailVerificationEmail(verifyUrl: string) {
   const subject = "Verify your Fit Finder email";
   const html = emailWrapper(`

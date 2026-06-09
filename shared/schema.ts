@@ -136,6 +136,7 @@ export const orders = pgTable("orders", {
   amountCents: integer("amount_cents").notNull(),
   currency: text("currency").notNull().default("usd"),
   status: orderStatusEnum("status").notNull().default("PENDING"),
+  reviewReminderSentAt: timestamp("review_reminder_sent_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

@@ -11,6 +11,8 @@ import { runSeedIfNeeded, runMigrationsIfNeeded } from "./seed";
 import { setupWebSocket } from "./websocket";
 import { botGuard } from "./middleware/bot-guard";
 import { csrfCheck } from "./middleware/csrf-check";
+import { storage } from "./storage";
+import { sendEmail, reviewReminderEmail } from "./email";
 
 // ── Environment detection ─────────────────────────────────────────────────────
 // Staging: a second Railway service with RAILWAY_ENVIRONMENT=staging set in its
@@ -226,6 +228,26 @@ app.use((req, res, next) => {
   await runSeedIfNeeded();
   await registerRoutes(httpServer, app);
   setupWebSocket(httpServer);
+
+  // ── Review reminder background job (runs every hour) ─────────────────────────
+  const APP_URL = process.env.FRONTEND_URL || process.env.APP_URL || "https://fitfinder.co";
+  async function sendReviewReminders() {
+    try {
+      const eligible = await storage.getOrdersNeedingReminder();
+      for (const row of eligible) {
+        const reviewUrl = `${APP_URL}/profile/${row.trainerId}`;
+        const { subject, html } = reviewReminderEmail(row.buyerName, row.trainerName, row.planTitle || "training plan", reviewUrl);
+        await sendEmail(row.buyerEmail, subject, html);
+        await storage.markOrderReminderSent(row.orderId);
+      }
+      if (eligible.length > 0) console.log(`[reminders] Sent ${eligible.length} review reminder(s)`);
+    } catch (e) {
+      console.error("[reminders] Review reminder job failed:", e);
+    }
+  }
+  // Run once on startup (catches orders from a restart) then hourly.
+  sendReviewReminders();
+  setInterval(sendReviewReminders, 60 * 60 * 1000);
 
   // ── Sentry error handler (5xx only — must be before the global handler) ────
   if (process.env.SENTRY_DSN) {

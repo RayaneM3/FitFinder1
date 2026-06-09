@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireEmailVerified } from "../middleware";
 import { stripe, calculatePlatformFee } from "../stripe";
+import { sendEmail, orderPaidBuyerEmail, orderPaidTrainerEmail } from "../email";
 import crypto from "crypto";
 import { z } from "zod";
 
@@ -116,6 +117,19 @@ router.post("/api/checkout", requireAuth, requireEmailVerified, async (req, res)
         stripeCheckoutSessionId: `sim_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       });
       await storage.updateOrderStatus(order.id, "PAID");
+      // Fire-and-forget confirmation emails (mirrors the real Stripe webhook path)
+      const buyer = await storage.getUser(req.user!.id);
+      const trainer = await storage.getUser(plan.trainerId);
+      if (buyer && trainer) {
+        const currency = (plan.currency || "usd").toUpperCase();
+        const fmt = (cents: number) =>
+          new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
+        const amount = fmt(plan.priceCents);
+        const buyerEmail = orderPaidBuyerEmail(buyer.name, trainer.name, plan.title, amount);
+        const trainerEmail = orderPaidTrainerEmail(trainer.name, buyer.name, plan.title, amount, fmt(plan.priceCents * 0.872));
+        sendEmail(buyer.email, buyerEmail.subject, buyerEmail.html);
+        sendEmail(trainer.email, trainerEmail.subject, trainerEmail.html);
+      }
       return res.json({ checkoutUrl: `${appUrl}/dashboard?payment=success&orderId=${order.id}` });
     }
 

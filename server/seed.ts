@@ -63,6 +63,10 @@ export async function runMigrationsIfNeeded() {
       CREATE INDEX IF NOT EXISTS "IDX_evt_user_id" ON "email_verification_tokens" ("user_id");
     `);
 
+    await pool.query(`
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS review_reminder_sent_at TIMESTAMP;
+    `);
+
     console.log("[migrate] Schema verified/applied.");
   } catch (e) {
     console.error("[migrate] Migration failed:", e);

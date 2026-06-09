@@ -107,6 +107,15 @@ export interface IStorage {
     amountCents: number;
     planTitle: string | null;
   }[]>;
+  getOrdersNeedingReminder(): Promise<{
+    orderId: string;
+    buyerEmail: string;
+    buyerName: string;
+    trainerName: string;
+    planTitle: string;
+    trainerId: string;
+  }[]>;
+  markOrderReminderSent(orderId: string): Promise<void>;
 
   // Favorites
   toggleFavorite(userId: string, trainerId: string): Promise<boolean>;
@@ -662,6 +671,33 @@ export class DatabaseStorage implements IStorage {
     .leftJoin(plans, eq(orders.planId, plans.id))
     .where(and(eq(orders.trainerId, trainerId), eq(orders.status, "PAID")))
     .orderBy(desc(orders.updatedAt));
+  }
+
+  async getOrdersNeedingReminder() {
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const rows = await db.execute(sql`
+      SELECT
+        o.id            AS "orderId",
+        buyer.email     AS "buyerEmail",
+        buyer.name      AS "buyerName",
+        trainer.name    AS "trainerName",
+        o.trainer_id    AS "trainerId",
+        p.title         AS "planTitle"
+      FROM orders o
+      INNER JOIN users buyer   ON buyer.id  = o.buyer_id
+      INNER JOIN users trainer ON trainer.id = o.trainer_id
+      LEFT  JOIN plans p       ON p.id      = o.plan_id
+      LEFT  JOIN reviews r     ON r.order_id = o.id
+      WHERE o.status = 'PAID'
+        AND o.updated_at < ${cutoff}
+        AND o.review_reminder_sent_at IS NULL
+        AND r.id IS NULL
+    `);
+    return rows.rows as { orderId: string; buyerEmail: string; buyerName: string; trainerName: string; trainerId: string; planTitle: string }[];
+  }
+
+  async markOrderReminderSent(orderId: string) {
+    await db.update(orders).set({ reviewReminderSentAt: new Date(), updatedAt: new Date() }).where(eq(orders.id, orderId));
   }
 
   // --- Favorites ---
